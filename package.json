@@ -1,0 +1,28 @@
+{
+  "name": "my-library-vue",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.76.1",
+    "@tailwindplus/elements": "^1.0.18",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.22",
+    "vue-router": "^4.6.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.16",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "tailwindcss": "^4.1.16",
+    "vite": "^7.1.7"
+  },
+  "description": "",
+  "main": "vite.config.js",
+  "author": "Camila Cristina Teixeira",
+  "license": "ISC"
+}

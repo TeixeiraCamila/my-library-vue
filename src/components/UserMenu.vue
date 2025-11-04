@@ -17,15 +17,14 @@ function closeMenu() {
 
 async function handleLogout() {
 	try {
-		closeMenu();
-
-		await authStore.signOut();
-
-		await router.push('/');
+		closeMenu()
+		await authStore.signOut()
+		router.push('/login')
 	} catch (error) {
-		console.error('❌ ERRO no logout:', error);
+		console.error('❌ ERRO no logout:', error)
 	}
 }
+
 </script>
 
 <template>
@@ -39,15 +38,15 @@ async function handleLogout() {
 		</button>
 
 		<div v-if="isMenuOpen" class="dropdown">
-			<router-link to="/profile" @click="closeMenu" class="menu-item">
+			<!-- <router-link to="/profile" @click="closeMenu" class="menu-item">
 				👤 Perfil
 			</router-link>
 
 			<router-link to="/settings" @click="closeMenu" class="menu-item">
 				⚙️ Configurações
-			</router-link>
+			</router-link> -->
 
-			<hr class="divider" />
+			<!-- <hr class="divider" /> -->
 
 			<button @click="handleLogout" class="menu-item logout" type="button">
 				🚪 Sair

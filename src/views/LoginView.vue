@@ -100,6 +100,7 @@ h1 {
 	text-align: center;
 	margin-bottom: 30px;
 	color: #333;
+	font-size: 1.5rem;
 }
 
 .form-group {

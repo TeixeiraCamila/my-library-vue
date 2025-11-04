@@ -37,7 +37,7 @@ const visiblePages = computed(() => {
 
 <template>
 	<div
-		class="container relative mx-auto px-40 py-20 pagination flex items-center flex-wrap gap-2"
+		class="container mx-auto py-5 px-5 flex items-center justify-center flex-wrap gap-2"
 	>
 		<button
 			@click="changePage(1, bookStore.perPage)"
@@ -85,7 +85,7 @@ const visiblePages = computed(() => {
 button {
 	min-width: 40px;
 }
-button:hover{
-  background-color: var(--accent2);
+button:hover {
+	background-color: var(--accent2);
 }
 </style>

@@ -1,68 +1,48 @@
+// ../composables/bookStore.js
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { supabase } from '../lib/supabaseClient';
+import { useAuthStore } from './authStore';
 
 export const useBookStore = defineStore('books', () => {
-	// State
+	const authStore = useAuthStore();
+
 	const books = ref([]);
 	const loading = ref(false);
 	const error = ref(null);
-
-	// Pagination state
 	const currentPage = ref(1);
 	const perPage = ref(16);
 	const total = ref(0);
-
-	//Estantes
 	const bookshelves = ref([]);
 
-	// Actions
-	async function enrichBooksWithShelves(booksData) {
-		if (!booksData || booksData.length === 0) return [];
+	// Enriquece livros com suas estantes
+	async function enrichBooksWithShelves(books) {
+		if (!books?.length) return books;
 
-		const bookIds = booksData.map((b) => b.book_id);
+		const bookIds = books.map((book) => book.book_id);
 
-		const { data: relations } = await supabase
-			.from('book_bookshelves')
-			.select('id, book_id, bookshelf_id')
-			.in('book_id', bookIds);
-
-		const shelfIds = [...new Set(relations?.map((r) => r.bookshelf_id) || [])];
-
-		const { data: shelves } = await supabase
-			.from('bookshelves')
-			.select('id, shelve')
-			.in('id', shelfIds);
-
-		return booksData.map((book) => {
-			const bookRelations =
-				relations?.filter((r) => r.book_id === book.book_id) || [];
-
-			const book_bookshelves = bookRelations.map((rel) => ({
-				id: rel.id,
-				bookshelf_id: rel.bookshelf_id,
-				bookshelves: shelves?.find((s) => s.id === rel.bookshelf_id) || null,
-			}));
-
-			return { ...book, book_bookshelves };
-		});
-	}
-
-	async function fetchBookshelves() {
 		try {
-			const { data, error: supabaseError } = await supabase
-				.from('bookshelves')
-				.select('id, shelve')
-				.order('shelve');
+			const { data: relations, error: relError } = await supabase
+				.from('book_shelves')
+				.select('book_id, shelf_id')
+				.in('book_id', bookIds);
 
-			if (supabaseError) throw supabaseError;
-			bookshelves.value = data || [];
-			console.log('✅ Estantes carregadas:', bookshelves.value);
+			if (relError) throw relError;
+
+			return books.map((book) => ({
+				...book,
+				book_bookshelves:
+					relations
+						?.filter((rel) => rel.book_id === book.book_id)
+						?.map((rel) => rel.shelf_id) || [],
+			}));
 		} catch (err) {
-			console.error('❌ Erro ao carregar estantes:', err);
+			console.error('❌ Erro ao carregar estantes dos livros:', err);
+			return books;
 		}
 	}
 
+	// Buscar livros
 	async function fetchBooks(page = 1, pageSize = perPage.value) {
 		loading.value = true;
 		error.value = null;
@@ -85,7 +65,7 @@ export const useBookStore = defineStore('books', () => {
 
 			if (booksError) throw booksError;
 
-			books.value = booksData;
+			books.value = (await enrichBooksWithShelves(booksData)) || [];
 			total.value = count || 0;
 			currentPage.value = page;
 			perPage.value = pageSize;
@@ -93,33 +73,29 @@ export const useBookStore = defineStore('books', () => {
 			console.log('✅ Livros carregados:', books.value);
 		} catch (err) {
 			error.value = err.message;
-			console.error('❌ Erro:', err);
+			console.error('❌ Erro ao carregar livros:', err);
 		} finally {
 			loading.value = false;
 		}
 	}
 
-	async function filterBooks(search, field) {
-		loading.value = true;
-		error.value = null;
+	// Buscar estantes
+	async function fetchBookshelves() {
 		try {
-			const { data: booksData, error: supabaseError } = await supabase
-				.from('my-books')
-				.select('*')
-				.or(`${field}.ilike.%${search}%`);
+			const { data, error: supabaseError } = await supabase
+				.from('bookshelves')
+				.select('id, shelve')
+				.order('shelve');
 
 			if (supabaseError) throw supabaseError;
-
-			books.value = booksData;
-			console.log('✅ Livros encontrados:', books.value);
+			bookshelves.value = data || [];
+			console.log('✅ Estantes carregadas:', bookshelves.value);
 		} catch (err) {
-			error.value = err.message;
-			console.error('❌ Erro:', err);
-		} finally {
-			loading.value = false;
+			console.error('❌ Erro ao carregar estantes:', err);
 		}
 	}
 
+	// Buscar livro
 	async function searchBook(search) {
 		loading.value = true;
 		error.value = null;
@@ -128,54 +104,68 @@ export const useBookStore = defineStore('books', () => {
 				.from('my-books')
 				.select('*')
 				.or(
-					`Title.ilike.%${search}%,Author.ilike.%${search}%,ISBN.ilike.%${search}%,ISBN13.ilike.%${search}%`
+					`title.ilike.%${search}%,author.ilike.%${search}%,isbn.ilike.%${search}%,isbn13.ilike.%${search}%`
 				);
 
 			if (supabaseError) throw supabaseError;
 
-			books.value = booksData;
+			books.value = (await enrichBooksWithShelves(booksData)) || [];
 			console.log('✅ Livros encontrados:', books.value);
 		} catch (err) {
 			error.value = err.message;
-			console.error('❌ Erro:', err);
+			console.error('❌ Erro ao buscar livros:', err);
 		} finally {
 			loading.value = false;
 		}
 	}
 
-	async function addBook(newBook, selectedBookshelfIds = []) {
+	// Adicionar livro e vincular shelves
+	async function addBook(newBook) {
+		if (!authStore.canCreate) {
+			throw new Error('Você não tem permissão para adicionar livros');
+		}
+
 		loading.value = true;
 		error.value = null;
 
 		try {
-			const { data, error: supabaseError } = await supabase
+			// Extrai prateleiras antes de inserir o livro
+			const shelves = newBook.book_bookshelves
+				? Array.isArray(newBook.book_bookshelves)
+					? newBook.book_bookshelves
+					: [newBook.book_bookshelves]
+				: [];
+
+			delete newBook.book_bookshelves;
+
+			// 1️⃣ Insere o livro
+			const { data: inserted, error: insertErr } = await supabase
 				.from('my-books')
 				.insert([newBook])
-				.select()
+				.select('book_id')
 				.single();
 
-			if (supabaseError) throw supabaseError;
+			if (insertErr) throw insertErr;
 
-			// relacionamentos com estantes
-			if (selectedBookshelfIds.length > 0) {
-				const relations = selectedBookshelfIds.map((shelfId) => ({
-					book_id: data.book_id,
-					bookshelf_id: shelfId,
+			const bookId = inserted.book_id;
+
+			// 2️⃣ Relaciona as prateleiras
+			if (shelves.length) {
+				const shelfLinks = shelves.map((shelfId) => ({
+					book_id: bookId,
+					shelf_id: shelfId,
 				}));
 
-				const { error: relError } = await supabase
-					.from('book_bookshelves')
-					.insert(relations);
+				const { error: relErr } = await supabase
+					.from('book_shelves')
+					.insert(shelfLinks);
 
-				if (relError) {
-					console.error('❌ Erro ao salvar estantes:', relError);
-				}
+				if (relErr) throw relErr;
 			}
 
-			books.value.unshift(data[0]);
-			console.log('✅ Livro adicionado:', data[0]);
-
-			return data[0];
+			console.log('✅ Livro e estantes adicionados:', inserted);
+			await fetchBooks();
+			return inserted;
 		} catch (err) {
 			error.value = err.message;
 			console.error('❌ Erro ao adicionar livro:', err);
@@ -185,51 +175,81 @@ export const useBookStore = defineStore('books', () => {
 		}
 	}
 
-	async function updateBook(bookId, updates, selectedBookshelfIds = []) {
+	// Atualizar livro
+	async function updateBook(bookId, updates) {
+		if (!authStore.canEdit) {
+			throw new Error('Você não tem permissão para editar livros');
+		}
+
 		loading.value = true;
 		error.value = null;
 
 		try {
+			// Extrai prateleiras (se vierem)
+			const shelves = updates.book_bookshelves
+				? Array.isArray(updates.book_bookshelves)
+					? updates.book_bookshelves
+					: [updates.book_bookshelves]
+				: [];
+
+			// Remove book_bookshelves do payload de atualização
+			const bookUpdates = { ...updates };
+			delete bookUpdates.book_bookshelves;
+
+			// 1️⃣ Atualiza o livro
 			const { data, error: supabaseError } = await supabase
 				.from('my-books')
-				.update(updates)
+				.update(bookUpdates)
 				.eq('book_id', bookId)
 				.select()
 				.single();
 
 			if (supabaseError) throw supabaseError;
 
-			//Atualizar estantes
-			// Remover estantes antigas
-			await supabase.from('book_bookshelves').delete().eq('book_id', bookId);
+			// 2️⃣ Atualiza as prateleiras
+			await supabase.from('book_shelves').delete().eq('book_id', bookId);
 
-			// Adicionar novas estantes
-			if (selectedBookshelfIds.length > 0) {
-				const relations = selectedBookshelfIds.map((shelfId) => ({
+			if (shelves.length > 0) {
+				const shelfLinks = shelves.map((shelfId) => ({
 					book_id: bookId,
-					bookshelf_id: shelfId,
+					shelf_id: parseInt(shelfId),
 				}));
 
-				await supabase.from('book_bookshelves').insert(relations);
+				const { error: relErr } = await supabase
+					.from('book_shelves')
+					.insert(shelfLinks);
+
+				if (relErr) throw relErr;
 			}
 
+			// atualiza livro no array local
 			const index = books.value.findIndex((book) => book.book_id === bookId);
 			if (index !== -1) {
-				books.value[index] = data;
+				books.value[index] = {
+					...data,
+					book_bookshelves: shelves,
+				};
 			}
 
-			console.log('✅ Livro atualizado:', data[0]);
-			return data[0];
+			console.log('✅ Livro atualizado:', data);
+			await fetchBooks(currentPage.value); // recarrega para pegar as shelves
+			return data;
 		} catch (err) {
 			error.value = err.message;
 			console.error('❌ Erro ao atualizar livro:', err);
 			throw err;
+			s;
 		} finally {
 			loading.value = false;
 		}
 	}
 
+	// Deletar livro
 	async function deleteBook(id) {
+		if (!authStore.canDelete) {
+			throw new Error('Você não tem permissão para deletar livros');
+		}
+
 		loading.value = true;
 		error.value = null;
 
@@ -241,7 +261,7 @@ export const useBookStore = defineStore('books', () => {
 
 			if (supabaseError) throw supabaseError;
 
-			books.value = books.value.filter((book) => book.id !== id);
+			books.value = books.value.filter((book) => book.book_id !== id);
 			console.log('✅ Livro deletado:', id);
 		} catch (err) {
 			error.value = err.message;
@@ -259,23 +279,20 @@ export const useBookStore = defineStore('books', () => {
 		currentPage,
 		perPage,
 		total,
-		// Gatters
+		bookshelves,
 		pagesCount: computed(() =>
 			perPage.value ? Math.ceil(total.value / perPage.value) : 0
 		),
 		next_page: computed(() =>
-			currentPage.value <
-			(perPage.value ? Math.ceil(total.value / perPage.value) : 0)
+			currentPage.value < Math.ceil(total.value / perPage.value)
 				? currentPage.value + 1
 				: null
 		),
 		prev_page: computed(() =>
 			currentPage.value > 1 ? currentPage.value - 1 : null
 		),
-
-		fetchBookshelves,
 		fetchBooks,
-		filterBooks,
+		fetchBookshelves,
 		searchBook,
 		addBook,
 		updateBook,

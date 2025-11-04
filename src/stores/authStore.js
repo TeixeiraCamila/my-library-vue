@@ -1,97 +1,232 @@
-// Authentication 
-
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { supabase } from '../lib/supabaseClient';
 
-
 export const useAuthStore = defineStore('auth', () => {
-	// State
-	const user = ref(null);
-	const loading = ref(false);
-	const error = ref(null);
-	const session = ref(null);
+  const user = ref(null);
+  const userProfile = ref(null);
+  const loading = ref(false);
+  const error = ref(null);
 
-	// Getters
-	const isAuthenticated = computed(() => !!user.value);
-	const userEmail = computed(() => user.value?.email || '');
+  // Computed
+  const isAuthenticated = computed(() => !!user.value);
+  const userRole = computed(() => userProfile.value?.role_name || 'viewer');
+  const roleId = computed(() => userProfile.value?.role_id || 3);
+  
+  // Permissões
+  const canCreate = computed(() => ['admin', 'editor'].includes(userRole.value));
+  const canEdit = computed(() => ['admin', 'editor'].includes(userRole.value));
+  const canDelete = computed(() => userRole.value === 'admin');
+  const isAdmin = computed(() => userRole.value === 'admin');
+  const isEditor = computed(() => userRole.value === 'editor');
+  const isViewer = computed(() => userRole.value === 'viewer');
 
-	// Actions
-	async function login(email, password) {
-		loading.value = true;
-		error.value = null;
+  // Actions
+  async function fetchUserProfile() {
+    if (!user.value) return;
 
-		try {
-			const { data, error: authError } = await supabase.auth.signInWithPassword(
-				{
-					email,
-					password,
-				}
-			);
+    try {
+      const { data, error: profileError } = await supabase
+        .from('users_with_roles')
+        .select('*')
+        .eq('auth_id', user.value.id)
+        .single();
 
-			if (authError) throw authError;
+      if (profileError) throw profileError;
 
-			user.value = data.user;
-			session.value = data.session;
-			console.log('✅ Login bem-sucedido:', user.value);
-			return data;
-		} catch (error) {
-			error.value = error.message;
-			console.error('❌ Erro ao fazer login:', error);
-			throw error;
-		} finally {
-			loading.value = false;
-		}
-	}
+      userProfile.value = data;
+      console.log('👤 Perfil do usuário:', userProfile.value);
+    } catch (err) {
+      console.error('❌ Erro ao buscar perfil:', err);
+      error.value = err.message;
+    }
+  }
 
-	async function logout() {
-		loading.value = true;
-		error.value = null;
-		try {
-			const { error: authError } = await supabase.auth.signOut();
-			if (authError) throw authError;
+  async function signUp(email, password, name) {
+    loading.value = true;
+    error.value = null;
 
-			user.value = null;
-			session.value = null;
-			console.log('✅ Logout bem-sucedido');
-		} catch (error) {
-			error.value = error.message;
-			console.error('❌ Erro ao fazer logout:', error);
-			throw error;
-		} finally {
-			loading.value = false;
-		}
-	}
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name
+          }
+        }
+      });
 
-	async function checkSession() {
-		const {
-			data: { session: currentSession },
-		} = await supabase.auth.getSession();
-		if (currentSession) {
-			session.value = currentSession;
-			user.value = currentSession.user;
-		}
-	}
+      if (signUpError) throw signUpError;
 
-	// mudança de estado de autenticação
-	supabase.auth.onAuthStateChange((_event, currentSession) => {
-		session.value = currentSession;
-		user.value = currentSession?.user || null;
-	});
+      user.value = data.user;
+      console.log('✅ Usuário registrado:', user.value);
+      
+      // Aguardar criação do perfil via trigger
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await fetchUserProfile();
 
-	function clearError() {
-		error.value = null;
-	}
-	return {
-		user,
-		loading,
-		error,
-		session,
-		isAuthenticated,
-		userEmail,
-		login,
-		logout,
-		checkSession,
-		clearError,
-	};
+      return data;
+    } catch (err) {
+      error.value = err.message;
+      console.error('❌ Erro no registro:', err);
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function signIn(email, password) {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (signInError) throw signInError;
+
+      user.value = data.user;
+      await fetchUserProfile();
+
+      console.log('✅ Login realizado:', user.value);
+      return data;
+    } catch (err) {
+      error.value = err.message;
+      console.error('❌ Erro no login:', err);
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function signOut() {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+
+      user.value = null;
+      userProfile.value = null;
+      console.log('✅ Logout realizado');
+    } catch (err) {
+      error.value = err.message;
+      console.error('❌ Erro no logout:', err);
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function initialize() {
+    loading.value = true;
+
+    try {
+      // Verificar sessão atual
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        user.value = session.user;
+        await fetchUserProfile();
+      }
+
+      // Observar mudanças de autenticação
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('🔄 Auth state changed:', event);
+        
+        if (session?.user) {
+          user.value = session.user;
+          await fetchUserProfile();
+        } else {
+          user.value = null;
+          userProfile.value = null;
+        }
+      });
+    } catch (err) {
+      console.error('❌ Erro ao inicializar auth:', err);
+      error.value = err.message;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // Admin functions
+  async function getAllUsers() {
+    if (!isAdmin.value) {
+      throw new Error('Sem permissão para listar usuários');
+    }
+
+    const { data, error: usersError } = await supabase
+      .from('users_with_roles')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (usersError) throw usersError;
+    return data;
+  }
+
+  async function updateUserRole(userId, newRoleId) {
+    if (!isAdmin.value) {
+      throw new Error('Sem permissão para alterar roles');
+    }
+
+    const { data, error: updateError } = await supabase
+      .from('users')
+      .update({ role_id: newRoleId, updated_at: new Date().toISOString() })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+    return data;
+  }
+
+  async function toggleUserActive(userId, active) {
+    if (!isAdmin.value) {
+      throw new Error('Sem permissão para ativar/desativar usuários');
+    }
+
+    const { data, error: updateError } = await supabase
+      .from('users')
+      .update({ active, updated_at: new Date().toISOString() })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+    return data;
+  }
+
+  return {
+    // State
+    user,
+    userProfile,
+    loading,
+    error,
+
+    // Computed
+    isAuthenticated,
+    userRole,
+    roleId,
+    canCreate,
+    canEdit,
+    canDelete,
+    isAdmin,
+    isEditor,
+    isViewer,
+
+    // Actions
+    signUp,
+    signIn,
+    signOut,
+    initialize,
+    fetchUserProfile,
+    getAllUsers,
+    updateUserRole,
+    toggleUserActive,
+  };
 });

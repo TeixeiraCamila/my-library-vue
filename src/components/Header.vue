@@ -4,8 +4,10 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import Search from './Search.vue';
 import UserMenu from './UserMenu.vue';
 import { useModal } from '../composables/useModal';
+import { useAuthStore } from '../stores/authStore';
 
 const { openForAdd } = useModal();
+const authStore = useAuthStore();
 
 const mobileMenuOpen = ref(false);
 const dropdownOpen = ref(false);
@@ -15,6 +17,14 @@ const handleClickOutside = (event) => {
 		dropdownOpen.value = false;
 	}
 };
+
+function handleAddBook() {
+	if (!authStore.canCreate) {
+		alert('Você não tem permissão para adicionar livros');
+		return;
+	}
+	openForAdd();
+}
 
 onMounted(() => {
 	document.addEventListener('click', handleClickOutside);
@@ -28,9 +38,9 @@ onUnmounted(() => {
 <template>
 	<header>
 		<nav
-			class="container relative mx-auto px-4 flex items-center gap-6 justify-between"
+			class="container mx-auto relative flex flex items-center gap-6 justify-between px-5"
 		>
-			<div class="flex items-center justify-between relative">
+			<div class="flex items-center justify-between gap-6">
 				<h1 class="py-5 px-2 font-bold whitespace-nowrap">My Library</h1>
 
 				<button
@@ -70,7 +80,13 @@ onUnmounted(() => {
 
 					<Search />
 
-					<button @click="openForAdd" class="btn-primary">Add Book</button>
+					<button
+						v-if="authStore.canCreate"
+						@click="handleAddBook"
+						class="btn-primary"
+					>
+						➕ Adicionar Livro
+					</button>
 				</div>
 			</div>
 			<UserMenu />

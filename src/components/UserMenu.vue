@@ -1,45 +1,57 @@
 <script setup>
 import { ref } from 'vue';
-
-import { useAuthStore } from '../stores/authStore';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '../stores/authStore';
 
 const authStore = useAuthStore();
 const router = useRouter();
 const isMenuOpen = ref(false);
+
 function toggleMenu() {
 	isMenuOpen.value = !isMenuOpen.value;
 }
+
 function closeMenu() {
 	isMenuOpen.value = false;
 }
 
 async function handleLogout() {
 	try {
-		await authStore.logout();
 		closeMenu();
-		router.push('/');
+
+		await authStore.signOut();
+
+		await router.push('/');
 	} catch (error) {
-		console.error('Logout failed:', error);
+		console.error('❌ ERRO no logout:', error);
 	}
 }
 </script>
 
 <template>
 	<div class="user-menu">
-		<button @click="toggleMenu" class="btn-primary rounded-xl">
-			<span>Bem vinda, {{ authStore.userEmail ? 'Camila ' : '' }}</span>
+		<button @click="toggleMenu" class="btn-primary rounded-xl" type="button">
+			<span>
+				Bem vinda,
+				{{ authStore.userProfile?.name || authStore.user?.email || 'Usuário' }}
+			</span>
 			<span>{{ isMenuOpen ? '▲' : '▼' }}</span>
 		</button>
+
 		<div v-if="isMenuOpen" class="dropdown">
 			<router-link to="/profile" @click="closeMenu" class="menu-item">
 				👤 Perfil
 			</router-link>
+
 			<router-link to="/settings" @click="closeMenu" class="menu-item">
 				⚙️ Configurações
 			</router-link>
+
 			<hr class="divider" />
-			<button @click="handleLogout" class="menu-item logout">🚪 Sair</button>
+
+			<button @click="handleLogout" class="menu-item logout" type="button">
+				🚪 Sair
+			</button>
 		</div>
 	</div>
 </template>
@@ -48,31 +60,22 @@ async function handleLogout() {
 .user-menu {
 	position: relative;
 }
-.user-menu .btn-primary:hover:not(:disabled) {
-	transform: translateY(0);
-}
-.user-button {
-	background: white;
-	border: 2px solid #e0e0e0;
-	padding: 10px 16px;
-	border-radius: 8px;
-	cursor: pointer;
+
+.user-menu .btn-primary {
 	display: flex;
 	align-items: center;
-	gap: 10px;
-	font-weight: 500;
-	color: #333;
+	gap: 8px;
+	padding: 10px 16px;
 }
 
-.user-button:hover {
-	border-color: #667eea;
+.user-menu .btn-primary:hover:not(:disabled) {
+	transform: translateY(0);
 }
 
 .dropdown {
 	position: absolute;
-	top: 100%;
+	top: calc(100% + 8px);
 	right: 0;
-	margin-top: 8px;
 	background: white;
 	border-radius: 8px;
 	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
@@ -92,6 +95,7 @@ async function handleLogout() {
 	color: #333;
 	text-decoration: none;
 	transition: background 0.2s;
+	font-size: 14px;
 }
 
 .menu-item:hover {
@@ -100,6 +104,7 @@ async function handleLogout() {
 
 .menu-item.logout {
 	color: #e53e3e;
+	font-weight: 500;
 }
 
 .menu-item.logout:hover {

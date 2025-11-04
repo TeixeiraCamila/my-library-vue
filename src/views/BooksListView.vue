@@ -1,35 +1,27 @@
 <script setup>
 import { onMounted } from 'vue';
-
 import { useBookStore } from '../stores/bookStore';
 
 import BookCard from '../components/BookCard.vue';
 
 const bookStore = useBookStore();
-onMounted(() => {
-	bookStore.fetchBooks();  
+
+onMounted(async () => {
+	await bookStore.fetchBooks();
+	await bookStore.fetchBookshelves();
 });
 </script>
 
 <template>
-	<div class="msg">
-		<div v-if="bookStore.loading">Carregando livros...</div>
-		<div v-if="bookStore.error">
-			{{ bookStore.error }}
-		</div>
-		<div>Total de livros registrados: {{ bookStore.total }}</div>
-	</div>
-
-	<div v-if="!bookStore.loading && bookStore.books.length > 0">
-		<div
-			class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-		>
-			<BookCard
-				v-for="book in bookStore.books"
-				:key="book.book_id"
-				:book="book"
-			/>
-		</div>
+  <div v-if="bookStore.loading" class="h-100">
+    LOADING
+  </div>
+	<div v-else class="books-list flex flex-wrap justify-between gap-8">
+		<BookCard
+			v-for="book in bookStore.books"
+			:key="`${book.book_id} - ${book.title}`"
+			:book="book"
+		/>
 	</div>
 </template>
 

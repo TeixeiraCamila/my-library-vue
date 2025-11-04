@@ -1,0 +1,19 @@
+=== TODAS AS CONSTRAINT
+SELECT conname AS constraint_name, contype AS type, convalidated, pg_get_constraintdef(c.oid)
+FROM pg_constraint c
+JOIN pg_namespace n ON n.oid = c.connamespace
+WHERE conrelid = 'my-books'::regclass;
+
+
+=== ADD CONSTRAINT
+
+alter table "my-books"
+add constraint chk_status check ( reading_status in ('read', 'currently-reading', 'tbr', 'abandonado') )
+
+
+UPDATE "my-books" AS m
+SET
+	reading_status = b."Exclusive Shelf"
+FROM "books" AS b
+WHERE m.title = b."Title";
+ 

@@ -1,110 +1,172 @@
-<!-- components/Modal.vue -->
 <script setup>
-import { ref } from 'vue';
+import {
+	ref,
+	watch,
+	onMounted,
+	onBeforeUnmount,
+	nextTick,
+	computed,
+} from 'vue';
 import { useModal } from '../composables/useModal';
+import { useBookStore } from '../stores/bookStore';
+import { useBookForm } from '../composables/useBookForm';
+
+const booksStore = useBookStore();
 
 const { close, mode, editingBook } = useModal();
 
-const title = ref(editingBook.value ? editingBook.value.Title || '' : '');
-const author = ref(editingBook.value ? editingBook.value.Author || '' : '');
+const isSubmitting = ref(false);
+const errorMessage = ref('');
 
-const additionalAuthors = ref(
-	editingBook.value ? editingBook.value['Additional Authors'] || '' : ''
-);
-const isbn = ref(editingBook.value ? editingBook.value.ISBN || '' : '');
-const isbn13 = ref(editingBook.value ? editingBook.value.ISBN13 || '' : '');
-const myRating = ref(
-	editingBook.value ? editingBook.value['My Rating'] || '' : ''
-);
-const publisher = ref(
-	editingBook.value ? editingBook.value.Publisher || '' : ''
-);
-const numberOfPages = ref(
-	editingBook.value ? editingBook.value['Number of Pages'] || '' : ''
-);
-const originalPublicationYear = ref(
-	editingBook.value
-		? editingBook.value['Original Publication Y'] ||
-				editingBook.value['Original Publication Year'] ||
-				''
-		: ''
-);
+const shelves = computed(() => booksStore.bookshelves || []);
 
-const bookshelves = ref(
-	editingBook.value ? editingBook.value.Bookshelves || '' : ''
-);
+// Inicializa o form DEPOIS de ter o editingBook
+const { form, setForm, buildPayload, resetForm } = useBookForm();
 
-const exclusiveShelf = ref(
-	editingBook.value ? editingBook.value['Exclusive Shelf'] || '' : ''
-);
-const myReview = ref(
-	editingBook.value ? editingBook.value['My Review'] || '' : ''
-);
+// Accessibility: focus management for modal
+const modalRef = ref(null);
+const previouslyFocused = ref(null);
+const focusableSelector =
+	'a[href], area[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-const readCount = ref(
-	editingBook.value ? editingBook.value['Read Count'] || 0 : 0
-);
-const ownedCopies = ref(
-	editingBook.value ? editingBook.value['Owned Copies'] || 0 : 0
-);
-const dataDeInicio = ref(
-	editingBook.value ? editingBook.value['Data de inicio'] || '' : ''
-);
-const dataDeTermino = ref(
-	editingBook.value ? editingBook.value['Data de término'] || '' : ''
-);
+function trapFocus(e) {
+	const el = modalRef.value;
+	if (!el) return;
+	const focusable = Array.from(el.querySelectorAll(focusableSelector));
+	if (focusable.length === 0) {
+		e.preventDefault();
+		return;
+	}
+	const index = focusable.indexOf(document.activeElement);
+	if (e.shiftKey) {
+		if (index === 0 || document.activeElement === el) {
+			focusable[focusable.length - 1].focus();
+			e.preventDefault();
+		}
+	} else {
+		if (index === focusable.length - 1) {
+			focusable[0].focus();
+			e.preventDefault();
+		}
+	}
+}
 
-const handleBackdropClick = (event) => {
-	// Fecha o modal se clicar fora do conteúdo
-	if (event.target === event.currentTarget) {
+function handleKeydown(e) {
+	if (e.key === 'Escape') {
 		close();
 	}
-};
+	if (e.key === 'Tab') {
+		trapFocus(e);
+	}
+}
 
-const handleSubmit = () => {
-	// Reunir os dados em um objeto — mapeando para os nomes das colunas originais quando aplicável
-	const payload = {
-		Title: title.value,
-		Author: author.value,
-		['Additional Authors']: additionalAuthors.value,
-		ISBN: isbn.value,
-		ISBN13: isbn13.value,
-		['My Rating']: myRating.value,
-		Publisher: publisher.value,
-		['Number of Pages']: numberOfPages.value,
-		['Original Publication Year']: originalPublicationYear.value,
-		Bookshelves: bookshelves.value,
-		['Exclusive Shelf']: exclusiveShelf.value,
-		['My Review']: myReview.value,
-		['Read Count']: readCount.value,
-		['Owned Copies']: ownedCopies.value,
-		['Data de inicio']: dataDeInicio.value,
-		['Data de término']: dataDeTermino.value,
-	};
+// 🔥 IMPORTANTE: Atualiza o form quando o editingBook muda
+watch(
+	() => editingBook.value,
+	(book) => {
+		console.log('📝 editingBook mudou:', book);
+		if (book) {
+			setForm(book);
+		} else {
+			resetForm();
+		}
+	},
+	{ immediate: true, deep: true } // immediate garante que executa na montagem também
+);
 
-	// Do not send book_id when creating a new book so the DB can auto-generate it.
-	// If editing an existing book, include its book_id (from editingBook).
-	if (editingBook.value && editingBook.value.book_id) {
-		payload.book_id = editingBook.value.book_id;
+onMounted(async () => {
+	previouslyFocused.value = document.activeElement;
+
+	// Carrega as estantes se necessário
+	if (!booksStore.bookshelves || booksStore.bookshelves.length === 0) {
+		await booksStore.fetchBookshelves();
 	}
 
-	console.log('Saving book payload:', payload);
-	// Aqui você pode chamar a store ou API para salvar/atualizar
-	// close();
+	// Se já tem editingBook, preenche o form
+	if (editingBook.value) {
+		console.log('🔄 Preenchendo form no onMounted:', editingBook.value);
+		setForm(editingBook.value);
+	}
+
+	nextTick(() => {
+		modalRef.value?.focus();
+		const first = modalRef.value?.querySelector(
+			'input, select, textarea, button'
+		);
+		first?.focus();
+	});
+
+	window.addEventListener('keydown', handleKeydown);
+});
+
+onBeforeUnmount(() => {
+	window.removeEventListener('keydown', handleKeydown);
+	if (previouslyFocused.value && previouslyFocused.value.focus) {
+		previouslyFocused.value.focus();
+	}
+});
+
+const handleBackdropClick = (event) => {
+	if (event.target === event.currentTarget) close();
+};
+
+const handleSubmit = async () => {
+	errorMessage.value = '';
+
+	console.log('🚀 Form atual:', form.value);
+	console.log('🚀 Mode:', mode.value);
+	console.log('🚀 EditingBook:', editingBook.value);
+
+	if (!form.value.title || !form.value.author) {
+		errorMessage.value = 'Título e Autor são obrigatórios!';
+		return;
+	}
+
+	isSubmitting.value = true;
+
+	try {
+		const payload = buildPayload();
+		console.log('📦 Payload final:', payload);
+
+		if (mode.value === 'edit' && editingBook.value?.book_id) {
+			await booksStore.updateBook(editingBook.value.book_id, payload);
+			console.log('✅ Livro atualizado');
+		} else {
+			await booksStore.addBook(payload);
+			console.log('✅ Livro criado');
+		}
+
+		close();
+	} catch (error) {
+		console.error('❌ Erro ao salvar livro:', error);
+		errorMessage.value = 'Erro ao salvar livro: ' + error.message;
+	} finally {
+		isSubmitting.value = false;
+	}
 };
 </script>
-
 <template>
 	<div
-		class="fixed inset-0 bg-black/30 backdrop-invert backdrop-opacity-10 flex items-center justify-center z-50"
+		class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50"
 		@click="handleBackdropClick"
 	>
-		<div class="modal bg-white rounded-lg p-6 mx-4">
+		<div
+			ref="modalRef"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="modal-title"
+			tabindex="-1"
+			class="modal bg-white rounded-lg p-6 mx-4 max-w-4xl w-full"
+		>
 			<div class="flex justify-between items-center mb-4">
-				<h2 class="text-2xl font-bold">
-					{{ mode === 'add' ? 'Add Book' : 'Edit Book' }}
+				<h2 id="modal-title" class="text-2xl font-bold">
+					{{ mode === 'add' ? '📚 Adicionar Livro' : '✏️ Editar Livro' }}
 				</h2>
-				<button @click="close" class="text-gray-500 hover:text-gray-700">
+				<button
+					@click="close"
+					class="text-gray-500 hover:text-gray-700"
+					aria-label="Fechar modal"
+				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="h-6 w-6"
@@ -123,177 +185,278 @@ const handleSubmit = () => {
 			</div>
 
 			<form @submit.prevent="handleSubmit">
-				<div class="space-y-4 max-h-[60vh] overflow-auto">
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+				<div
+					v-if="errorMessage"
+					class="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm"
+				>
+					⚠️ {{ errorMessage }}
+				</div>
+
+				<div class="space-y-4 max-h-[60vh] overflow-auto pr-2">
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<label class="flex flex-col">
-							<span>Título</span>
+							<span class="font-medium mb-1">Title *</span>
 							<input
 								type="text"
-								v-model="title"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-						<label class="flex flex-col">
-							<span>Autor</span>
-							<input
-								type="text"
-								v-model="author"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-						<label class="flex flex-col">
-							Additional Authors
-							<input
-								type="text"
-								v-model="additionalAuthors"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-						<label class="flex flex-col">
-							ISBN
-							<input
-								type="text"
-								v-model="isbn"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-						<label class="flex flex-col">
-							ISBN13
-							<input
-								type="text"
-								v-model="isbn13"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-						<label class="flex flex-col">
-							My Rating
-							<input
-								type="number"
-								v-model="myRating"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-						<label class="flex flex-col">
-							Publisher
-							<input
-								type="text"
-								v-model="publisher"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								v-model="form.title"
+								required
+								placeholder="Nome do livro"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
 						</label>
 
 						<label class="flex flex-col">
-							Number of Pages
-							<input
-								type="number"
-								v-model="numberOfPages"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-						<label class="flex flex-col">
-							Original Publication Year
+							<span class="font-medium mb-1">Author *</span>
 							<input
 								type="text"
-								v-model="originalPublicationYear"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								v-model="form.author"
+								required
+								placeholder="Nome do autor"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
 						</label>
 
 						<label class="flex flex-col">
-							Bookshelves
+							<span class="font-medium mb-1">Additional Authors</span>
 							<input
 								type="text"
-								v-model="bookshelves"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								v-model="form.additional_authors"
+								placeholder="Co-autores (separados por vírgula)"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
 						</label>
+
 						<label class="flex flex-col">
-							Exclusive Shelf
+							<span class="font-medium mb-1">Publisher</span>
+							<input
+								type="text"
+								v-model="form.publisher"
+								placeholder="Nome da editora"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+							/>
+						</label>
+
+						<label class="flex flex-col">
+							<span class="font-medium mb-1">ISBN</span>
+							<input
+								type="text"
+								v-model="form.isbn"
+								placeholder="ISBN-10"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+							/>
+						</label>
+
+						<label class="flex flex-col">
+							<span class="font-medium mb-1">ISBN-13</span>
+							<input
+								type="text"
+								v-model="form.isbn13"
+								placeholder="ISBN-13"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+							/>
+						</label>
+
+						<label class="flex flex-col">
+							<span class="font-medium mb-1">Binding</span>
 							<select
-								v-model="exclusiveShelf"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								v-model="form.binding"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							>
-								<option value="">—</option>
-								<option value="tbr">📚 Para Ler</option>
-								<option value="currently-reading">📖 Lendo</option>
-								<option value="read">✅ Lido</option>
+								<option value="">Selecione</option>
+								<option value="Paperback">Brochura</option>
+								<option value="Hardcover">Capa Dura</option>
+								<option value="Kindle Edition">Kindle</option>
+								<option value="ebook">E-book</option>
+								<option value="Audiobook">Audiobook</option>
 							</select>
 						</label>
+
 						<label class="flex flex-col">
-							Read Count
+							<span class="font-medium mb-1">Number Of Pages</span>
 							<input
 								type="number"
-								v-model="readCount"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								v-model="form.number_of_pages"
+								min="0"
+								placeholder="Ex: 256"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
 						</label>
+
 						<label class="flex flex-col">
-							Owned Copies
+							<span class="font-medium mb-1">Publication Year</span>
 							<input
 								type="number"
-								v-model="ownedCopies"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								v-model="form.publication_year"
+								min="1000"
+								max="2100"
+								placeholder="Ex: 2023"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
 						</label>
+
 						<label class="flex flex-col">
-							Data de início
+							<span class="font-medium mb-1">Shelf</span>
+							<select
+								v-model="form.book_bookshelves"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+							>
+								<option value="">Nenhuma</option>
+								<option
+									v-for="shelf in shelves"
+									:key="shelf.id"
+									:value="shelf.id"
+								>
+									{{ shelf.emoji }} {{ shelf.shelve }}
+								</option>
+							</select>
+							<span class="text-xs text-gray-500 mt-1">
+								Segure Ctrl/Cmd para selecionar múltiplas
+							</span>
+						</label>
+
+						<label class="flex flex-col">
+							<span class="font-medium mb-1">Reading Status</span>
+							<select
+								v-model="form.reading_status"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+							>
+								<option value="">Nenhuma</option>
+								<option value="tbr">📚 Quero Ler</option>
+								<option value="currently-reading">📖 Lendo</option>
+								<option value="read">✅ Lido</option>
+								<option value="abandonado">❌ Abandonado</option>
+							</select>
+						</label>
+
+						<label class="flex flex-col">
+							<span class="font-medium mb-1">My Rating</span>
+							<select
+								v-model="form.my_rating"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+							>
+								<option value="">Não avaliado</option>
+								<option value="1">⭐ 1 estrela</option>
+								<option value="2">⭐⭐ 2 estrelas</option>
+								<option value="3">⭐⭐⭐ 3 estrelas</option>
+								<option value="4">⭐⭐⭐⭐ 4 estrelas</option>
+								<option value="5">⭐⭐⭐⭐⭐ 5 estrelas</option>
+							</select>
+						</label>
+
+						<label class="flex flex-col">
+							<span class="font-medium mb-1">Vezes Lido</span>
 							<input
-								type="date"
-								v-model="dataDeInicio"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								type="text"
+								v-model="form.read_count"
+								placeholder="Ex: 1, 2, 3..."
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
 						</label>
+
+						<label class="flex items-center gap-2 pt-7">
+							<input
+								type="checkbox"
+								v-model="form.owned_copies"
+								class="w-5 h-5 rounded focus:ring-2 focus:ring-sky-400"
+							/>
+							<span class="font-medium">Possuo cópia física</span>
+						</label>
+
 						<label class="flex flex-col">
-							Data de término
+							<span class="font-medium mb-1">Data de Início da Leitura</span>
 							<input
 								type="date"
-								v-model="dataDeTermino"
-								class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								v-model="form.start_date"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+							/>
+						</label>
+
+						<label class="flex flex-col">
+							<span class="font-medium mb-1">Data de Término da Leitura</span>
+							<input
+								type="date"
+								v-model="form.finish_date"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
 						</label>
 					</div>
 
-					<div class="mt-3 flex flex-col">
-						<label class="block mb-1 font-medium">My Review</label>
-						<select
-							v-model="myReview"
-							class="primaty-input py-2 pl-10 pr-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-						>
-							<option value="">—</option>
-							<option value="0">0</option>
-							<option value="1">1</option>
-							<option value="2">2</option>
-							<option value="3">3</option>
-							<option value="4">4</option>
-							<option value="5">5</option>
-						</select>
+					<div class="flex flex-col">
+						<label class="font-medium mb-1">Minha Resenha</label>
+						<textarea
+							v-model="form.my_review"
+							rows="4"
+							placeholder="Escreva sua opinião sobre o livro..."
+							class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 resize-none"
+						></textarea>
 					</div>
 				</div>
 
-				<div class="flex gap-2 mt-6">
+				<div class="flex gap-3 mt-6">
 					<button
 						type="button"
 						@click="close"
-						class="btn-secundary flex-1 px-4 py-2 rounded"
+						class="btn-secundary flex-1 px-4 py-2 rounded-xl"
+						:disabled="isSubmitting"
 					>
-						Cancel
+						Cancelar
 					</button>
-					<button type="submit" class="btn-primary flex-1 px-4 py-2 rounded">
-						Save
+					<button
+						type="submit"
+						class="btn-primary flex-1 px-4 py-2 rounded-xl"
+						:disabled="isSubmitting"
+					>
+						{{
+							isSubmitting
+								? '⏳ Salvando...'
+								: mode === 'add'
+								? '➕ Adicionar'
+								: '💾 Salvar'
+						}}
 					</button>
 				</div>
 			</form>
 		</div>
 	</div>
 </template>
+
 <style scoped>
 .modal {
-	box-shadow: 0 0 #000, 0 0 #000, 3px 3px 0 0 #fff3d9;
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
-.btn-primary:hover:not(:disabled) {
-	transform: translateY(0);
+
+.btn-primary:hover:not(:disabled),
+.btn-secundary:hover:not(:disabled) {
+	transform: translateY(-1px);
+	transition: transform 0.2s;
 }
+
+.btn-primary:disabled,
+.btn-secundary:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
 label {
 	align-items: flex-start;
+}
+
+/* Scrollbar customizada */
+.overflow-auto::-webkit-scrollbar {
+	width: 8px;
+}
+
+.overflow-auto::-webkit-scrollbar-track {
+	background: #f1f1f1;
+	border-radius: 10px;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb {
+	background: #888;
+	border-radius: 10px;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb:hover {
+	background: #555;
 }
 </style>

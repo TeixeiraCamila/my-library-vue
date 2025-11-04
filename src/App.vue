@@ -3,25 +3,20 @@ import Header from './components/Header.vue';
 import Pagination from './components/Pagination.vue';
 import Modal from './components/Modal.vue';
 
-import { onMounted } from 'vue';
 import { useAuthStore } from './stores/authStore';
 import { useModal } from './composables/useModal';
 
 const authStore = useAuthStore();
 const { isOpen } = useModal();
-
-onMounted(async () => {
-	await authStore.checkSession();
-});
 </script>
 
 <template>
 	<Header v-if="authStore.isAuthenticated" />
-	<main class="container relative mx-auto px-4">
+	<main class="container mx-auto py-10 px-5">
 		<RouterView />
 	</main>
 	<Pagination v-if="authStore.isAuthenticated" />
-	<Modal v-if="isOpen"/>
+	<Modal v-if="isOpen" />
 </template>
 
 <style scoped>

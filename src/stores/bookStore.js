@@ -1,4 +1,4 @@
-// ../composables/bookStore.js
+// ../store/bookStore.js
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { supabase } from '../lib/supabaseClient';
@@ -61,7 +61,8 @@ export const useBookStore = defineStore('books', () => {
 			} = await supabase
 				.from('my-books')
 				.select('*', { count: 'exact' })
-				.range(from, to);
+				.range(from, to)
+        .order('date_added', { ascending: false });
 
 			if (booksError) throw booksError;
 
@@ -121,6 +122,7 @@ export const useBookStore = defineStore('books', () => {
 
 	// Adicionar livro e vincular shelves
 	async function addBook(newBook) {
+		console.log("🚀 ~ addBook ~ newBook:", newBook)
 		if (!authStore.canCreate) {
 			throw new Error('Você não tem permissão para adicionar livros');
 		}
@@ -129,7 +131,7 @@ export const useBookStore = defineStore('books', () => {
 		error.value = null;
 
 		try {
-			// Extrai prateleiras antes de inserir o livro
+			//Extrai prateleiras antes de inserir o livro
 			const shelves = newBook.book_bookshelves
 				? Array.isArray(newBook.book_bookshelves)
 					? newBook.book_bookshelves

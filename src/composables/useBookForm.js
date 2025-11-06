@@ -11,7 +11,7 @@ export function useBookForm(initialData = null) {
 		binding: '',
 		number_of_pages: null,
 		publication_year: null,
-		book_bookshelves: [], // array com id das shelves
+		book_bookshelves: [], 
 		reading_status: '',
 		my_rating: '',
 		my_review: '',
@@ -55,7 +55,7 @@ export function useBookForm(initialData = null) {
 			binding: '',
 			number_of_pages: null,
 			publication_year: null,
-			book_bookshelves: [], // array com id das shelves
+			book_bookshelves: [], 
 			reading_status: '',
 			my_rating: '',
 			my_review: '',

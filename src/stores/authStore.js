@@ -7,6 +7,7 @@ export const useAuthStore = defineStore('auth', () => {
   const userProfile = ref(null);
   const loading = ref(false);
   const error = ref(null);
+  const initialized = ref(false); 
 
   // Computed
   const isAuthenticated = computed(() => !!user.value);
@@ -123,7 +124,14 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function initialize() {
+    // 👈 CORRIGIDO: Evitar múltiplas inicializações
+    if (initialized.value) {
+      console.log('⏭️  Auth já inicializado, pulando...');
+      return;
+    }
+    
     loading.value = true;
+    console.log('🔄 Inicializando autenticação...');
 
     try {
       // Verificar sessão atual
@@ -132,6 +140,9 @@ export const useAuthStore = defineStore('auth', () => {
       if (session?.user) {
         user.value = session.user;
         await fetchUserProfile();
+        console.log('✅ Sessão restaurada:', user.value.email);
+      } else {
+        console.log('ℹ️  Nenhuma sessão ativa');
       }
 
       // Observar mudanças de autenticação
@@ -151,6 +162,8 @@ export const useAuthStore = defineStore('auth', () => {
       error.value = err.message;
     } finally {
       loading.value = false;
+      initialized.value = true; // 👈 ADICIONADO: Marcar como inicializado
+      console.log('✅ Autenticação inicializada');
     }
   }
 
@@ -207,6 +220,7 @@ export const useAuthStore = defineStore('auth', () => {
     userProfile,
     loading,
     error,
+    initialized, 
 
     // Computed
     isAuthenticated,

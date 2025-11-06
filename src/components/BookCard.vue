@@ -31,7 +31,6 @@ const shelfEmoji = computed(() => {
 
 	return emojiMap[shelf] || ' ';
 });
-
 </script>
 
 <template>
@@ -42,15 +41,15 @@ const shelfEmoji = computed(() => {
 	>
 		<div
 			v-if="book.reading_status"
-			class="book-shelf-badge absolute top-2 left-2 bg-white text-xs px-2 py-1 rounded-xl shadow-md"
+			class="book-shelf-badge absolute top-1 left-1 bg-white text-xs px-2 py-1 rounded-xl shadow-md"
 			:title="`Prateleira: ${book.reading_status}`"
 		>
 			{{ shelfEmoji }}
 		</div>
 
 		<div class="book-content flex flex-col items-center gap-2">
-      <BookCover :book="book" :size="medium"/>
-			
+			<BookCover :book="book" :size="medium" />
+
 			<div class="book-info">
 				<h2 class="text-lg font-semibold text-center">{{ book.title }}</h2>
 				<p class="text-sm text-gray-600 text-center">by {{ book.author }}</p>
@@ -74,7 +73,7 @@ const shelfEmoji = computed(() => {
 .book-card {
 	background: var(--panel);
 	border-radius: 18px;
-	padding: 16px;
+	padding: 8px;
 	box-shadow: var(--shadow);
 	display: flex;
 	flex-direction: column;
@@ -96,9 +95,8 @@ const shelfEmoji = computed(() => {
 	box-shadow: 0 0 #000, 0 0 #000, 3px 3px 0 0 var(--to-be-read);
 }
 
-.book-shelf-badge,
-.book-additional-shelves {
-	font-size: 11px;
+.book-shelf-badge {
+	font-size: 16px;
 	font-weight: 600;
 	z-index: 10;
 	white-space: nowrap;
@@ -106,11 +104,6 @@ const shelfEmoji = computed(() => {
 
 .book-shelf-badge {
 	background: white;
-}
-
-.book-additional-shelves {
-	background: #eff6ff;
-	color: #1e40af;
 }
 
 .book-info {

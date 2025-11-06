@@ -12,7 +12,7 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: lazyLoad('LoginView'),
-      meta: { requiresGuest: true }
+      meta: { requiresGuest: true },
     },
     {
       path: '/about',
@@ -23,40 +23,40 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: lazyLoad('LoginView'),
-      meta: { requiresGuest: true }
+      meta: { requiresGuest: true },
     },
     {
       path: '/register',
       name: 'register',
       component: lazyLoad('RegisterView'),
-      meta: { requiresGuest: true }
+      meta: { requiresGuest: true },
     },
     {
       path: '/books',
       name: 'books',
       component: lazyLoad('BooksListView'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/list',
       name: 'list',
       component: lazyLoad('BooksListView'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
     },
     {
       path: '/admin',
       name: 'admin',
       component: lazyLoad('AdminView'),
-      meta: { 
-        requiresAuth: true, 
-        requiresAdmin: true 
-      }
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+      },
     },
     {
       path: '/seed',
       name: 'seed',
       component: lazyLoad('SeedView'),
-      meta: { onlyDevelopment: true }
+      meta: { onlyDevelopment: true },
     },
     {
       path: '/unauthorized',
@@ -67,22 +67,25 @@ const router = createRouter({
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: lazyLoad('NotFoundView'),
-    }
+    },
   ],
 });
 
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore();
-
-  // Aguardar inicialização do auth se necessário
-  if (!authStore.user && !authStore.loading) {
+  
+  // 🔧 CORRIGIDO: Aguardar inicialização completa antes de verificar auth
+  if (!authStore.initialized) {
+    console.log('⏳ Aguardando inicialização do auth...');
     await authStore.initialize();
   }
-
-  const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
-  const requiresGuest = to.matched.some(record => record.meta.requiresGuest);
-  const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
-  const onlyDevelopment = to.matched.some(record => record.meta.onlyDevelopment);
+  
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
+  const requiresGuest = to.matched.some((record) => record.meta.requiresGuest);
+  const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin);
+  const onlyDevelopment = to.matched.some(
+    (record) => record.meta.onlyDevelopment
+  );
 
   // Bloquear rota de seed em produção
   if (onlyDevelopment && import.meta.env.PROD) {
@@ -92,14 +95,14 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // Se requer autenticação e não está autenticado
-  if (requiresAuth && !authStore.isAuthenticated) {
+  if (!authStore.isAuthenticated && requiresAuth) {
     console.log('🔒 Acesso negado: usuário não autenticado');
     next({ name: 'login', query: { redirect: to.fullPath } });
     return;
   }
 
   // Se requer guest (login/register) e está autenticado
-  if (requiresGuest && authStore.isAuthenticated) {
+  if (authStore.isAuthenticated && requiresGuest) {
     console.log('✅ Usuário já autenticado, redirecionando para books');
     next({ name: 'books' });
     return;

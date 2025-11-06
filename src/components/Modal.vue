@@ -126,15 +126,16 @@ const handleSubmit = async () => {
 
 	try {
 		const payload = buildPayload();
-		console.log('📦 Payload final:', payload);
 
 		if (mode.value === 'edit' && editingBook.value?.book_id) {
 			await booksStore.updateBook(editingBook.value.book_id, payload);
 			console.log('✅ Livro atualizado');
 		} else {
+      console.log(mode.value);
 			await booksStore.addBook(payload);
 			console.log('✅ Livro criado');
 		}
+    
 
 		close();
 	} catch (error) {

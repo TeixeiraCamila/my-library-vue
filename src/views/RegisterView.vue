@@ -69,7 +69,7 @@ async function handleRegister() {
 						id="email"
 						v-model="email"
 						type="email"
-						placeholder="seu@email.com"
+						placeholder="seu.melhor.email@email.com"
 						required
 					/>
 				</div>
@@ -81,7 +81,7 @@ async function handleRegister() {
 						id="password"
 						v-model="password"
 						type="password"
-						placeholder="••••••••"
+						placeholder="••••"
 						required
 					/>
 				</div>
@@ -93,7 +93,7 @@ async function handleRegister() {
 						id="confirmPassword"
 						v-model="confirmPassword"
 						type="password"
-						placeholder="••••••••"
+						placeholder="••••"
 						required
 					/>
 				</div>

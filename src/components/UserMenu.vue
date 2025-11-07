@@ -17,37 +17,27 @@ function closeMenu() {
 
 async function handleLogout() {
 	try {
-		closeMenu()
-		await authStore.signOut()
-		router.push('/login')
+		closeMenu();
+		await authStore.signOut();
+		router.push('/login');
 	} catch (error) {
-		console.error('❌ ERRO no logout:', error)
+		console.error('❌ ERRO no logout:', error);
 	}
 }
-
 </script>
 
 <template>
 	<div class="user-menu">
 		<button @click="toggleMenu" class="btn-primary rounded-xl" type="button">
-			<span>
+			<span class="hidden md:flex">
 				Bem vinda,
 				{{ authStore.userProfile?.name || authStore.user?.email || 'Usuário' }}
 			</span>
-			<span>{{ isMenuOpen ? '▲' : '▼' }}</span>
+			<span class="hidden md:flex">{{ isMenuOpen ? '▲' : '▼' }}</span>
+			<span class="flex md:hidden">👤</span>
 		</button>
 
 		<div v-if="isMenuOpen" class="dropdown">
-			<!-- <router-link to="/profile" @click="closeMenu" class="menu-item">
-				👤 Perfil
-			</router-link>
-
-			<router-link to="/settings" @click="closeMenu" class="menu-item">
-				⚙️ Configurações
-			</router-link> -->
-
-			<!-- <hr class="divider" /> -->
-
 			<button @click="handleLogout" class="menu-item logout" type="button">
 				🚪 Sair
 			</button>

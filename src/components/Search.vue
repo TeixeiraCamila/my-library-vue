@@ -15,7 +15,7 @@ function search() {
 </script>
 
 <template>
-	<div class="hidden md:flex items-center">
+	<div class="md:flex items-center">
 		<div class="relative flex items-center gap-2">
 			<input
 				type="text"
@@ -32,7 +32,7 @@ function search() {
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
-					class="w-5 h-5 left-3 "
+					class="w-5 h-5 left-3"
 				>
 					<path
 						stroke-linecap="round"

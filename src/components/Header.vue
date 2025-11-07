@@ -64,20 +64,9 @@ onUnmounted(() => {
 					</svg>
 				</button>
 				<div
-					:class="[
-						'flex-col md:flex-row items-start md:items-center md:gap-3',
-						mobileMenuOpen ? 'flex' : 'hidden md:flex',
-					]"
-					class="relative"
+					:class="mobileMenuOpen ? 'mobile flex' : 'no-mobile hidden md:flex'"
+					class="sub-menu items-start flex-col md:flex-row md:items-center md:gap-3"
 				>
-					<!-- <RouterLink
-						class="btn-primary rounded-xl py-2 px-3 w-full md:w-auto whitespace-nowrap"
-						to="/"
-					>
-						Go to Home
-					</RouterLink>
-          -->
-
 					<Search />
 
 					<button
@@ -101,5 +90,16 @@ nav {
 nav h1 {
 	font-size: 2rem;
 	text-shadow: 2px 2px rgba(255, 107, 107, 0.12);
+}
+nav .sub-menu.mobile {
+	background: white;
+	padding: 16px;
+	gap: 10px;
+	position: absolute;
+	top: 101%;
+	left: 0;
+	z-index: 11;
+	width: 100%;
+	box-shadow: 0 0 #000, 0 0 #000, 3px 3px 0 0 rgba(255, 107, 107, 0.12);
 }
 </style>

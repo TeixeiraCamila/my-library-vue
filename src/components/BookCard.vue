@@ -35,7 +35,7 @@ const shelfEmoji = computed(() => {
 
 <template>
 	<div
-		class="book-card w-full sm:w-1/2 md:w-1/3 lg:w-1/4 xl:w-1/5 bg-white p-4 shadow-lg rounded-lg flex flex-col"
+		class="book-card w-full sm:w-1/2 md:w-1/3 lg:w-1/4 xl:w-1/5 bg-white p-4 shadow-lg rounded-lg flex flex-col items-center gap-2"
 		:class="`shelf-${book.reading_status}`"
 		:id="book.book_id"
 	>
@@ -48,8 +48,12 @@ const shelfEmoji = computed(() => {
 		</div>
 
 		<div class="book-content flex flex-col items-center gap-2">
-			<BookCover :book="book" :size="medium" />
-
+			<!-- <BookCover :book="book" :size="medium" /> -->
+			<img
+				src="https://placehold.co/80x120"
+				:alt="`Capa do livro ${book.title}`"
+				class="w-28 h-auto rounded-md shadow-md"
+			/>
 			<div class="book-info">
 				<h2 class="text-lg font-semibold text-center">{{ book.title }}</h2>
 				<p class="text-sm text-gray-600 text-center">by {{ book.author }}</p>
@@ -71,14 +75,6 @@ const shelfEmoji = computed(() => {
 
 <style scoped>
 .book-card {
-	background: var(--panel);
-	border-radius: 18px;
-	padding: 8px;
-	box-shadow: var(--shadow);
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-	align-items: center;
 	transition: transform 0.12s ease;
 	position: relative;
 }

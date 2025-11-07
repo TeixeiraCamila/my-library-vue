@@ -62,7 +62,7 @@ export const useBookStore = defineStore('books', () => {
 				.from('my-books')
 				.select('*', { count: 'exact' })
 				.range(from, to)
-        .order('date_added', { ascending: false });
+				.order('date_added', { ascending: false });
 
 			if (booksError) throw booksError;
 
@@ -122,7 +122,6 @@ export const useBookStore = defineStore('books', () => {
 
 	// Adicionar livro e vincular shelves
 	async function addBook(newBook) {
-		console.log("🚀 ~ addBook ~ newBook:", newBook)
 		if (!authStore.canCreate) {
 			throw new Error('Você não tem permissão para adicionar livros');
 		}
@@ -132,11 +131,7 @@ export const useBookStore = defineStore('books', () => {
 
 		try {
 			//Extrai prateleiras antes de inserir o livro
-			const shelves = newBook.book_bookshelves
-				? Array.isArray(newBook.book_bookshelves)
-					? newBook.book_bookshelves
-					: [newBook.book_bookshelves]
-				: [];
+			const shelves = [].concat(newBook.book_bookshelves || []);
 
 			delete newBook.book_bookshelves;
 
@@ -265,6 +260,7 @@ export const useBookStore = defineStore('books', () => {
 
 			books.value = books.value.filter((book) => book.book_id !== id);
 			console.log('✅ Livro deletado:', id);
+      await fetchBooks(currentPage.value);
 		} catch (err) {
 			error.value = err.message;
 			console.error('❌ Erro ao deletar livro:', err);

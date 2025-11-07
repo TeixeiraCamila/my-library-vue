@@ -1,12 +1,5 @@
 <script setup>
-import {
-	ref,
-	watch,
-	onMounted,
-	onBeforeUnmount,
-	nextTick,
-	computed,
-} from 'vue';
+import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue';
 import { useModal } from '../composables/useModal';
 import { useBookStore } from '../stores/bookStore';
 import { useBookForm } from '../composables/useBookForm';
@@ -25,86 +18,6 @@ const { form, setForm, buildPayload, resetForm } = useBookForm();
 
 // Accessibility: focus management for modal
 const modalRef = ref(null);
-const previouslyFocused = ref(null);
-const focusableSelector =
-	'a[href], area[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-function trapFocus(e) {
-	const el = modalRef.value;
-	if (!el) return;
-	const focusable = Array.from(el.querySelectorAll(focusableSelector));
-	if (focusable.length === 0) {
-		e.preventDefault();
-		return;
-	}
-	const index = focusable.indexOf(document.activeElement);
-	if (e.shiftKey) {
-		if (index === 0 || document.activeElement === el) {
-			focusable[focusable.length - 1].focus();
-			e.preventDefault();
-		}
-	} else {
-		if (index === focusable.length - 1) {
-			focusable[0].focus();
-			e.preventDefault();
-		}
-	}
-}
-
-function handleKeydown(e) {
-	if (e.key === 'Escape') {
-		close();
-	}
-	if (e.key === 'Tab') {
-		trapFocus(e);
-	}
-}
-
-// 🔥 IMPORTANTE: Atualiza o form quando o editingBook muda
-watch(
-	() => editingBook.value,
-	(book) => {
-		console.log('📝 editingBook mudou:', book);
-		if (book) {
-			setForm(book);
-		} else {
-			resetForm();
-		}
-	},
-	{ immediate: true, deep: true } // immediate garante que executa na montagem também
-);
-
-onMounted(async () => {
-	previouslyFocused.value = document.activeElement;
-
-	// Carrega as estantes se necessário
-	if (!booksStore.bookshelves || booksStore.bookshelves.length === 0) {
-		await booksStore.fetchBookshelves();
-	}
-
-	// Se já tem editingBook, preenche o form
-	if (editingBook.value) {
-		console.log('🔄 Preenchendo form no onMounted:', editingBook.value);
-		setForm(editingBook.value);
-	}
-
-	nextTick(() => {
-		modalRef.value?.focus();
-		const first = modalRef.value?.querySelector(
-			'input, select, textarea, button'
-		);
-		first?.focus();
-	});
-
-	window.addEventListener('keydown', handleKeydown);
-});
-
-onBeforeUnmount(() => {
-	window.removeEventListener('keydown', handleKeydown);
-	if (previouslyFocused.value && previouslyFocused.value.focus) {
-		previouslyFocused.value.focus();
-	}
-});
 
 const handleBackdropClick = (event) => {
 	if (event.target === event.currentTarget) close();
@@ -121,31 +34,42 @@ const handleSubmit = async () => {
 		errorMessage.value = 'Título e Autor são obrigatórios!';
 		return;
 	}
-
 	isSubmitting.value = true;
 
 	try {
 		const payload = buildPayload();
+		console.log('📦 Payload final:', payload);
 
 		if (mode.value === 'edit' && editingBook.value?.book_id) {
 			await booksStore.updateBook(editingBook.value.book_id, payload);
 			console.log('✅ Livro atualizado');
 		} else {
-      console.log(mode.value);
 			await booksStore.addBook(payload);
 			console.log('✅ Livro criado');
 		}
-    
 
-		close();
+		// close();
 	} catch (error) {
 		console.error('❌ Erro ao salvar livro:', error);
 		errorMessage.value = 'Erro ao salvar livro: ' + error.message;
 	} finally {
+		close();
 		isSubmitting.value = false;
 	}
 };
+onMounted(async () => {
+	// Carrega as estantes se necessário
+	if (!booksStore.bookshelves || booksStore.bookshelves.length === 0) {
+		await booksStore.fetchBookshelves();
+	}
+	// Se já tem editingBook, preenche o form
+	if (editingBook.value) {
+		console.log('🔄 Preenchendo form no onMounted:', editingBook.value);
+		setForm(editingBook.value);
+	}
+});
 </script>
+
 <template>
 	<div
 		class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50"
@@ -184,7 +108,6 @@ const handleSubmit = async () => {
 					</svg>
 				</button>
 			</div>
-
 			<form @submit.prevent="handleSubmit">
 				<div
 					v-if="errorMessage"
@@ -192,7 +115,6 @@ const handleSubmit = async () => {
 				>
 					⚠️ {{ errorMessage }}
 				</div>
-
 				<div class="space-y-4 max-h-[60vh] overflow-auto pr-2">
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<label class="flex flex-col">
@@ -212,7 +134,7 @@ const handleSubmit = async () => {
 								type="text"
 								v-model="form.author"
 								required
-								placeholder="Nome do autor"
+								placeholder="Nome do livro"
 								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
 						</label>
@@ -228,6 +150,32 @@ const handleSubmit = async () => {
 						</label>
 
 						<label class="flex flex-col">
+							<span class="font-medium mb-1">Binding</span>
+							<select
+								v-model="form.binding"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+							>
+								<option value="">Selecione</option>
+								<option value="paperback">Brochura</option>
+								<option value="hardcover">Capa Dura</option>
+								<option value="kindle">Kindle</option>
+								<option value="ebook">E-book</option>
+								<option value="audiobook">Audiobook</option>
+							</select>
+						</label>
+
+						<label class="flex flex-col">
+							<span class="font-medium mb-1">Number Of Pages</span>
+							<input
+								type="number"
+								v-model="form.number_of_pages"
+								min="0"
+								placeholder="Ex: 256"
+								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+							/>
+						</label>
+
+						<label class="flex flex-col">
 							<span class="font-medium mb-1">Publisher</span>
 							<input
 								type="text"
@@ -237,7 +185,7 @@ const handleSubmit = async () => {
 							/>
 						</label>
 
-						<label class="flex flex-col">
+            <label class="flex flex-col">
 							<span class="font-medium mb-1">ISBN</span>
 							<input
 								type="text"
@@ -256,143 +204,8 @@ const handleSubmit = async () => {
 								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
 						</label>
-
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Binding</span>
-							<select
-								v-model="form.binding"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							>
-								<option value="">Selecione</option>
-								<option value="Paperback">Brochura</option>
-								<option value="Hardcover">Capa Dura</option>
-								<option value="Kindle Edition">Kindle</option>
-								<option value="ebook">E-book</option>
-								<option value="Audiobook">Audiobook</option>
-							</select>
-						</label>
-
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Number Of Pages</span>
-							<input
-								type="number"
-								v-model="form.number_of_pages"
-								min="0"
-								placeholder="Ex: 256"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Publication Year</span>
-							<input
-								type="number"
-								v-model="form.publication_year"
-								min="1000"
-								max="2100"
-								placeholder="Ex: 2023"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Shelf</span>
-							<select
-								v-model="form.book_bookshelves"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							>
-								<option value="">Nenhuma</option>
-								<option
-									v-for="shelf in shelves"
-									:key="shelf.id"
-									:value="shelf.id"
-								>
-									{{ shelf.emoji }} {{ shelf.shelve }}
-								</option>
-							</select>
-							<span class="text-xs text-gray-500 mt-1">
-								Segure Ctrl/Cmd para selecionar múltiplas
-							</span>
-						</label>
-
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Reading Status</span>
-							<select
-								v-model="form.reading_status"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							>
-								<option value="">Nenhuma</option>
-								<option value="tbr">📚 Quero Ler</option>
-								<option value="currently-reading">📖 Lendo</option>
-								<option value="read">✅ Lido</option>
-								<option value="abandonado">❌ Abandonado</option>
-							</select>
-						</label>
-
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">My Rating</span>
-							<select
-								v-model="form.my_rating"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							>
-								<option value="">Não avaliado</option>
-								<option value="1">⭐ 1 estrela</option>
-								<option value="2">⭐⭐ 2 estrelas</option>
-								<option value="3">⭐⭐⭐ 3 estrelas</option>
-								<option value="4">⭐⭐⭐⭐ 4 estrelas</option>
-								<option value="5">⭐⭐⭐⭐⭐ 5 estrelas</option>
-							</select>
-						</label>
-
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Vezes Lido</span>
-							<input
-								type="text"
-								v-model="form.read_count"
-								placeholder="Ex: 1, 2, 3..."
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-
-						<label class="flex items-center gap-2 pt-7">
-							<input
-								type="checkbox"
-								v-model="form.owned_copies"
-								class="w-5 h-5 rounded focus:ring-2 focus:ring-sky-400"
-							/>
-							<span class="font-medium">Possuo cópia física</span>
-						</label>
-
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Data de Início da Leitura</span>
-							<input
-								type="date"
-								v-model="form.start_date"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Data de Término da Leitura</span>
-							<input
-								type="date"
-								v-model="form.finish_date"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
-							/>
-						</label>
-					</div>
-
-					<div class="flex flex-col">
-						<label class="font-medium mb-1">Minha Resenha</label>
-						<textarea
-							v-model="form.my_review"
-							rows="4"
-							placeholder="Escreva sua opinião sobre o livro..."
-							class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 resize-none"
-						></textarea>
 					</div>
 				</div>
-
 				<div class="flex gap-3 mt-6">
 					<button
 						type="button"
@@ -421,43 +234,4 @@ const handleSubmit = async () => {
 	</div>
 </template>
 
-<style scoped>
-.modal {
-	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-}
-
-.btn-primary:hover:not(:disabled),
-.btn-secundary:hover:not(:disabled) {
-	transform: translateY(-1px);
-	transition: transform 0.2s;
-}
-
-.btn-primary:disabled,
-.btn-secundary:disabled {
-	opacity: 0.6;
-	cursor: not-allowed;
-}
-
-label {
-	align-items: flex-start;
-}
-
-/* Scrollbar customizada */
-.overflow-auto::-webkit-scrollbar {
-	width: 8px;
-}
-
-.overflow-auto::-webkit-scrollbar-track {
-	background: #f1f1f1;
-	border-radius: 10px;
-}
-
-.overflow-auto::-webkit-scrollbar-thumb {
-	background: #888;
-	border-radius: 10px;
-}
-
-.overflow-auto::-webkit-scrollbar-thumb:hover {
-	background: #555;
-}
-</style>
+<style scoped></style>

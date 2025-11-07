@@ -13,13 +13,13 @@ onMounted(async () => {
 </script>
 
 <template>
-	<div class="container mx-auto flex flex-col items-center justify-center ">
-		<div v-if="bookStore.loading" class="py-50 ">
+	<div class="container mx-auto flex flex-col items-center justify-center">
+		<div v-if="bookStore.loading" class="py-50">
 			<img src="../assets/loader.gif" alt="Loading..." />
 		</div>
-    <div >
-      <h3>Total de livros encontrados: {{ bookStore.total }}</h3>
-    </div>
+		<div>
+			<h3>Total de livros encontrados: {{ bookStore.total }}</h3>
+		</div>
 		<div
 			v-if="!bookStore.loading"
 			class="books-list flex flex-wrap justify-between gap-2 py-10 px-5"

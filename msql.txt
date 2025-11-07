@@ -17,3 +17,57 @@ SET
 FROM "books" AS b
 WHERE m.title = b."Title";
  
+
+ const books = document.querySelectorAll('.bookalike.review');
+
+const data = Array.from(books).map(book => {
+  const title = book.querySelector('.field.title')?.textContent.trim() || '';
+  const dateStarted = book.querySelector('.field.date_started')?.textContent.trim() || '';
+  return { title, dateStarted };
+});
+
+console.log(data);
+
+
+PEGAR AS DATAS DE LEITURA DO GOODREADS
+const books = document.querySelectorAll('.bookalike.review');
+
+const data = Array.from(books).reduce((acc, book) => {
+  const title = book.querySelector('.field.title a')?.textContent.trim() || '';
+  const rawDate = book.querySelector('.date_started_value')?.textContent.trim() || '';
+
+  if (!rawDate) return acc; // pula se não tiver data
+
+  const date = new Date(rawDate);
+  if (isNaN(date)) return acc; // pula se a data for inválida
+
+  acc.push({
+    title,
+    dateStarted: date.toISOString().split('T')[0], // YYYY-MM-DD
+  });
+
+  return acc;
+}, []);
+
+console.log(data);
+
+INSERIR DATAS
+const handleSubmit = async () => {
+	for (const item of data) {
+		const { title, dateStarted } = item;
+
+		if (!title || !dateStarted) continue;
+
+		const { error } = await supabase
+			.from('my-books')
+			.update({ start_date: dateStarted })
+			.eq('title', title)
+			.is('start_date', null); // só atualiza se estiver vazio
+
+		if (error) {
+			console.error(`Erro ao atualizar "${title}":`, error.message);
+		} else {
+			console.log(`Atualizado: ${title}`);
+		}
+	}
+};

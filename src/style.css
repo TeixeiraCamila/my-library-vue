@@ -11,11 +11,11 @@
 	--accent3: #a2fcfd;
 	--error-color: #c00;
 	--text: #101010;
-	--shadow: 0 10px 30px rgba(16, 16, 16, 0.08);
+	--shadow: 0 10px 30px #10101014;
 	--border: 1px solid rgb(34 34 34 / 1);
 	--box-shadow: 0 0 #000, 0 0 #000, 2.8px 2.8px 0 0 #222222;
 	--max-width: 78rem;
-	--border-radius: 9999px;
+	--border-radius: 10px;
 
 	--to-be-read: #d6ffd8;
 	--read: #fff2c2;
@@ -56,10 +56,12 @@ body {
 	transition: box-shadow 0.3s;
 	padding: 12px;
 	border-radius: var(--border-radius);
+  color: var(--muted);
 }
 .primary-input:focus {
 	outline: none;
 	box-shadow: 0 0 #000, 0 0 #000, 2.8px 2.8px 0 0 #e27777;
+  color: #000;
 }
 .btn-primary {
 	box-shadow: var(--box-shadow);

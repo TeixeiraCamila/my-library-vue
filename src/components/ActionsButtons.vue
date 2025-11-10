@@ -14,17 +14,6 @@ const props = defineProps({
 
 const bookStore = useBookStore();
 
-// function deletBook(id) {
-// 	if (!id) return;
-// 	bookStore.deleteBook(id);
-// 	setTimeout(() => {
-// 		bookStore.fetchBooks();
-// 	}, 500);
-// }
-// function editBook(id) {
-// 	console.log(id);
-// }
-
 function handleEditBook(book) {
 	if (!authStore.canEdit) {
 		alert('Você não tem permissão para editar livros');
@@ -33,26 +22,35 @@ function handleEditBook(book) {
 	openForEdit(book);
 }
 
-function handleDeleteBook(bookId) {
-  bookStore.deleteBook(bookId);
-	if (confirm('Tem certeza que deseja deletar?')) {
-		
+async function handleDeleteBook(bookId) {
+	if (!authStore.canDelete) {
+		alert('Você não tem permissão para deletar livros');
+		return;
+	}
+
+	try {
+		if (confirm(`Tem certeza que deseja deletar este livro?`)) {
+			await bookStore.deleteBook(bookId);
+		}
+	} catch (error) {
+		console.error('[ActionsButtons] Erro ao deletar:', error);
+		alert('Não foi possível deletar o livro. Tente novamente.');
 	}
 }
 </script>
 
 <template>
-	<div class="book-actions flex items-center gap-2">
+	<div class="book-actions flex items-center justify-center gap-10">
 		<button
 			v-if="authStore.canEdit"
-			class="btn-secundary"
+			class="btn-secundary hover:scale-105"
 			@click="handleEditBook(book)"
 		>
 			✏️ Editar
 		</button>
 		<button
 			v-if="authStore.canDelete"
-			class="btn-secundary"
+			class="btn-secundary hover:scale-105"
 			@click="handleDeleteBook(book.book_id)"
 		>
 			🗑️ Deletar

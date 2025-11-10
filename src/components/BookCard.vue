@@ -23,10 +23,10 @@ const shelfEmoji = computed(() => {
 	const shelf = normalizedShelf.value;
 
 	const emojiMap = {
-		read: '✅',
-		'currently-reading': '📖',
-		'to-read': '📚',
-		abandonado: '❌',
+		read: '✅ Read',
+		'currently-reading': '📖 Currently Reading',
+		'to-read': '📚 In my TBR',
+		abandonado: '❌ Abandonado',
 	};
 
 	return emojiMap[shelf] || ' ';
@@ -35,41 +35,58 @@ const shelfEmoji = computed(() => {
 
 <template>
 	<div
-		class="book-card w-full sm:w-1/2 md:w-1/3 lg:w-1/4 xl:w-1/5 bg-white p-4 shadow-lg rounded-lg flex flex-col items-center gap-2"
+		class="book-card bg-white p-4 rounded-lg transform transition-transform duration-150 ease-out"
 		:class="`shelf-${book.reading_status}`"
 		:id="book.book_id"
+		role="article"
+		tabindex="0"
 	>
 		<div
 			v-if="book.reading_status"
-			class="book-shelf-badge absolute top-1 left-1 bg-white text-xs px-2 py-1 rounded-xl shadow-md"
-			:title="`Prateleira: ${book.reading_status}`"
+			class="book-shelf-badge group/badge absolute top-2 left-2 bg-white/90 text-xs px-2 py-1 rounded-full shadow ring-1 ring-sky-100 flex items-center gap-2"
 		>
-			{{ shelfEmoji }}
+			<span aria-hidden="true">{{ shelfEmoji }}</span>
+			<span class="sr-only peer">Prateleira: {{ book.reading_status }}</span>
 		</div>
 
-		<div class="book-content flex flex-col items-center gap-2">
-			<!-- <BookCover :book="book" :size="medium" /> -->
-			<img
-				src="https://placehold.co/80x120"
-				:alt="`Capa do livro ${book.title}`"
-				class="w-28 h-auto rounded-md shadow-md"
-			/>
-			<div class="book-info">
-				<h2 class="text-lg font-semibold text-center">{{ book.title }}</h2>
-				<p class="text-sm text-gray-600 text-center">by {{ book.author }}</p>
-			</div>
-			<div class="book-rating flex flex-col items-center gap-2">
-				<span v-if="book.my_rating && book.my_rating !== '0'">
-					{{ '⭐'.repeat(Math.round(book.my_rating)) }}
-				</span>
+		<div class="flex flex-col flex-grow w-full">
+			<div class="book-content flex-grow flex flex-col items-center gap-2">
+				<BookCover :book="book" :size="medium" />
+				<!-- <img
+					src="https://placehold.co/160x220"
+					:alt="`Capa do livro ${book.title}`"
+					class="w-28 h-40 object-cover rounded-md shadow-sm"
+				/> -->
+				<div class="book-info">
+					<h2
+						id="{{ book.book_id }}-title"
+						class="text-base font-semibold text-center text-gray-800 leading-tight"
+					>
+						{{ book.title }}
+					</h2>
+					<p class="text-sm text-gray-500 text-center mt-1">
+						by {{ book.author }}
+					</p>
+				</div>
+				<div class="book-rating flex flex-col items-center gap-2">
+					<span
+						v-if="book.my_rating && book.my_rating !== '0'"
+						class="text-sm "
+						aria-label="Avaliação: {{ book.my_rating }}"
+					>
+						{{ '⭐'.repeat(Math.round(book.my_rating)) }}
+					</span>
 
-				<span v-if="book.finish_date" class="text-xs text-gray-500">
-					📅 {{ formatDate(book.start_date) }} -
-					{{ formatDate(book.finish_date) }}
-				</span>
+					<span v-if="book.start_date" class="text-xs text-gray-400">
+						📅 {{ formatDate(book.start_date) }} -
+						{{ formatDate(book.finish_date) }}
+					</span>
+				</div>
+			</div>
+			<div class="w-full mt-auto pt-3">
+				<ActionsButtons :book="book" />
 			</div>
 		</div>
-		<ActionsButtons :book="book" />
 	</div>
 </template>
 
@@ -92,18 +109,14 @@ const shelfEmoji = computed(() => {
 }
 
 .book-shelf-badge {
-	font-size: 16px;
+	font-size: 14px;
 	font-weight: 600;
 	z-index: 10;
 	white-space: nowrap;
 }
 
-.book-shelf-badge {
-	background: white;
-}
-
 .book-info {
-	min-height: 77px;
+	min-height: 72px;
 	width: 100%;
 }
 

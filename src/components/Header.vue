@@ -1,30 +1,18 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-
 import Search from './Search.vue';
 import UserMenu from './UserMenu.vue';
-import { useModal } from '../composables/useModal';
-import { useAuthStore } from '../stores/authStore';
 
-const { openForAdd } = useModal();
-const authStore = useAuthStore();
+
 
 const mobileMenuOpen = ref(false);
-const dropdownOpen = ref(false);
 
 const handleClickOutside = (event) => {
-	if (!event.target.closest('.relative')) {
-		dropdownOpen.value = false;
+	if (!event.target.closest('.mobile-menu-container')) {
+		mobileMenuOpen.value = false;
 	}
 };
 
-function handleAddBook() {
-	if (!authStore.canCreate) {
-		alert('Você não tem permissão para adicionar livros');
-		return;
-	}
-	openForAdd();
-}
 
 onMounted(() => {
 	document.addEventListener('click', handleClickOutside);
@@ -36,70 +24,69 @@ onUnmounted(() => {
 </script>
 
 <template>
-	<header>
-		<nav
-			class="container mx-auto relative flex flex items-center gap-6 justify-between px-5"
-		>
+	<header class="bg-gradient-to-b from-amber-50 to-amber-100 shadow-sm">
+		<nav class="container mx-auto px-5 py-5 relative">
 			<div class="flex items-center justify-between gap-6">
-				<h1 class="py-5 px-2 font-bold whitespace-nowrap">My Library</h1>
-
-				<button
-					type="button"
-					class="md:hidden"
-					@click="mobileMenuOpen = !mobileMenuOpen"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						class="w-6 h-6"
+				<!-- Logo e Menu Mobile Toggle -->
+				<div class="flex items-center gap-4 mobile-menu-container">
+					<h1
+						class="text-3xl font-bold text-gray-800 whitespace-nowrap"
+						style="text-shadow: 2px 2px rgba(255, 107, 107, 0.12)"
 					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"
-						/>
-					</svg>
-				</button>
-				<div
-					:class="mobileMenuOpen ? 'mobile flex' : 'no-mobile hidden md:flex'"
-					class="sub-menu items-start flex-col md:flex-row md:items-center md:gap-3"
-				>
-					<Search />
+						My Library
+					</h1>
 
+					<!-- Botão Menu Mobile -->
 					<button
-						v-if="authStore.canCreate"
-						@click="handleAddBook"
-						class="btn-primary"
+						type="button"
+						class="md:hidden p-2 hover:bg-amber-200 rounded-lg transition-colors"
+						@click="mobileMenuOpen = !mobileMenuOpen"
+						aria-label="Toggle menu"
 					>
-						➕ Adicionar Livro
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							class="w-6 h-6"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"
+							/>
+						</svg>
 					</button>
+
+					<!-- Menu Desktop -->
+					<div class="hidden md:flex items-center gap-3">
+						<Search />
+						<!-- <button
+							v-if="authStore.canCreate"
+							@click="handleAddBook"
+							class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium transition-colors duration-200 whitespace-nowrap"
+						>
+							➕ Adicionar Livro
+						</button> -->
+					</div>
+
+					<!-- Menu Mobile (Dropdown) -->
+					<div
+						v-if="mobileMenuOpen"
+						class="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg z-50 md:hidden"
+						style="box-shadow: 3px 3px 0 0 rgba(255, 107, 107, 0.12)"
+					>
+						<div class="p-4 flex flex-col gap-3">
+							<Search />
+							
+						</div>
+					</div>
 				</div>
+
+				<!-- User Menu -->
+				<UserMenu />
 			</div>
-			<UserMenu />
 		</nav>
 	</header>
 </template>
-
-<style scoped>
-nav {
-	background: linear-gradient(180deg, #fff9ee, #fff3d9);
-}
-nav h1 {
-	font-size: 2rem;
-	text-shadow: 2px 2px rgba(255, 107, 107, 0.12);
-}
-nav .sub-menu.mobile {
-	background: white;
-	padding: 16px;
-	gap: 10px;
-	position: absolute;
-	top: 101%;
-	left: 0;
-	z-index: 11;
-	width: 100%;
-	box-shadow: 0 0 #000, 0 0 #000, 3px 3px 0 0 rgba(255, 107, 107, 0.12);
-}
-</style>

@@ -1,14 +1,22 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useModal } from '../composables/useModal';
 import { useBookStore } from '../stores/bookStore';
 import { useBookForm } from '../composables/useBookForm';
+import { Heading, Label, ErrorText } from './ui';
 
 const booksStore = useBookStore();
 const { close, mode, editingBook } = useModal();
 
 const isSubmitting = ref(false);
 const errorMessage = ref('');
+const fieldErrors = ref({
+	title: '',
+	author: '',
+	number_of_pages: '',
+	publication_year: '',
+	read_count: '',
+});
 
 const shelves = computed(() => booksStore.bookshelves || []);
 
@@ -21,12 +29,20 @@ const handleBackdropClick = (event) => {
 	if (event.target === event.currentTarget) close();
 };
 
+// Limpar erros de campo específico
+const clearFieldError = (field) => {
+	fieldErrors.value[field] = '';
+	if (errorMessage.value) errorMessage.value = '';
+};
+
 // Validação de limites para int2 (smallint: -32,768 a 32,767)
-const validateInt2 = (value, fieldName) => {
+const validateInt2 = (value, fieldName, fieldKey) => {
 	const num = parseInt(value);
 	if (isNaN(num)) return true; // Permite vazio
 	if (num < -32768 || num > 32767) {
-		errorMessage.value = `${fieldName} deve estar entre -32,768 e 32,767`;
+		fieldErrors.value[
+			fieldKey
+		] = `${fieldName} deve estar entre -32,768 e 32,767`;
 		return false;
 	}
 	return true;
@@ -35,24 +51,43 @@ const validateInt2 = (value, fieldName) => {
 const handleSubmit = async () => {
 	console.log('🚀 [1] Iniciando handleSubmit');
 	errorMessage.value = '';
+	fieldErrors.value = {
+		title: '',
+		author: '',
+		number_of_pages: '',
+		publication_year: '',
+		read_count: '',
+	};
 
 	console.log('🚀 [2] Form atual:', form.value);
 	console.log('🚀 [3] Mode:', mode.value);
 	console.log('🚀 [4] EditingBook:', editingBook.value);
 
 	// Validação básica
-	if (!form.value.title || !form.value.author) {
-		console.log('❌ [5] Validação falhou: título ou autor vazios');
-		errorMessage.value = 'Título e Autor são obrigatórios!';
-		return;
+	let hasError = false;
+
+	if (!form.value.title) {
+		fieldErrors.value.title = 'Título é obrigatório';
+		hasError = true;
+	}
+
+	if (!form.value.author) {
+		fieldErrors.value.author = 'Autor é obrigatório';
+		hasError = true;
 	}
 
 	// Validar apenas read_count (int2), pois number_of_pages e publication_year são int4
-	if (
-		form.value.read_count &&
-		!validateInt2(form.value.read_count, 'Contagem de leituras')
-	) {
-		console.log('❌ [6] Validação falhou: read_count inválido');
+	if (form.value.read_count) {
+		if (
+			!validateInt2(form.value.read_count, 'Contagem de leituras', 'read_count')
+		) {
+			hasError = true;
+		}
+	}
+
+	if (hasError) {
+		console.log('❌ [5] Validação falhou');
+		errorMessage.value = 'Por favor, corrija os erros antes de continuar';
 		return;
 	}
 
@@ -66,20 +101,26 @@ const handleSubmit = async () => {
 
 		if (mode.value === 'edit' && editingBook.value?.book_id) {
 			console.log('✏️ [10] Modo EDIÇÃO - chamando updateBook');
-			const result = await booksStore.updateBook(editingBook.value.book_id, payload);
+			const result = await booksStore.updateBook(
+				editingBook.value.book_id,
+				payload
+			);
 			console.log('✅ [11] updateBook retornou:', result);
 		} else {
 			console.log('➕ [12] Modo ADICIONAR - chamando addBook');
 			const result = await booksStore.addBook(payload);
 			console.log('✅ [13] addBook retornou:', result);
 		}
-		
+
 		console.log('🎉 [14] Sucesso! Fechando modal...');
 		close();
 		console.log('✅ [15] Modal fechado');
 	} catch (error) {
-		// Log structured error and show a friendly message to the user
-		logAndFormat(error, 'Salvar livro');
+		console.error('❌ [16] ERRO CAPTURADO:', error);
+		console.error('❌ [17] Tipo do erro:', typeof error);
+		console.error('❌ [18] Stack:', error.stack);
+		errorMessage.value =
+			'Erro ao salvar livro: ' + (error.message || 'Erro desconhecido');
 	} finally {
 		console.log('🔄 [19] Finalizando - isSubmitting = false');
 		isSubmitting.value = false;
@@ -118,7 +159,7 @@ watch(
 
 <template>
 	<div
-		class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50"
+		class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4"
 		@click="handleBackdropClick"
 	>
 		<div
@@ -127,15 +168,16 @@ watch(
 			aria-modal="true"
 			aria-labelledby="modal-title"
 			tabindex="-1"
-			class="modal bg-white rounded-lg p-6 mx-4 max-w-4xl w-full"
+			class="bg-white rounded-xl p-6 w-full max-w-4xl shadow-2xl"
 		>
-			<div class="flex justify-between items-center mb-4">
-				<h2 id="modal-title" class="text-2xl font-bold">
+			<!-- Header -->
+			<div class="flex justify-between items-center mb-6">
+				<Heading level="2" id="modal-title">
 					{{ mode === 'add' ? '📚 Adicionar Livro' : '✏️ Editar Livro' }}
-				</h2>
+				</Heading>
 				<button
 					@click="close"
-					class="text-gray-500 hover:text-gray-700"
+					class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
 					aria-label="Fechar modal"
 				>
 					<svg
@@ -154,140 +196,211 @@ watch(
 					</svg>
 				</button>
 			</div>
+
+			<!-- Form -->
 			<form @submit.prevent="handleSubmit">
+				<!-- Error Message Geral -->
 				<div
 					v-if="errorMessage"
-					class="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm"
+					class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-start gap-2"
 				>
-					⚠️ {{ errorMessage }}
+					<svg
+						class="w-5 h-5 mt-0.5 flex-shrink-0"
+						fill="currentColor"
+						viewBox="0 0 20 20"
+					>
+						<path
+							fill-rule="evenodd"
+							d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+							clip-rule="evenodd"
+						/>
+					</svg>
+					<span>{{ errorMessage }}</span>
 				</div>
-				<div class="space-y-4 max-h-[60vh] overflow-auto pr-2">
+
+				<!-- Fields -->
+				<div class="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Title *</span>
+						<!-- Title -->
+						<div class="flex flex-col justify-start">
+							<Label for="title" required :error="!!fieldErrors.title">
+								Título
+							</Label>
 							<input
+								class="primary-input"
+								id="title"
 								type="text"
 								v-model.trim="form.title"
-								required
+								@input="clearFieldError('title')"
 								placeholder="Nome do livro"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								:class="[
+									fieldErrors.title
+										? 'border-2 border-red-500 focus:ring-red-400'
+										: 'border border-gray-300 focus:ring-sky-400',
+								]"
 							/>
-						</label>
+							<ErrorText :show="!!fieldErrors.title">
+								{{ fieldErrors.title }}
+							</ErrorText>
+						</div>
 
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Author *</span>
+						<!-- Author -->
+						<div class="flex flex-col justify-start">
+							<Label for="author" required :error="!!fieldErrors.author">
+								Autor
+							</Label>
 							<input
+								class="primary-input"
+								id="author"
 								type="text"
 								v-model.trim="form.author"
-								required
+								@input="clearFieldError('author')"
 								placeholder="Nome do autor"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								:class="[
+									fieldErrors.author
+										? 'border-2 border-red-500 focus:ring-red-400'
+										: 'border border-gray-300 focus:ring-sky-400',
+								]"
 							/>
-						</label>
+							<ErrorText :show="!!fieldErrors.author">
+								{{ fieldErrors.author }}
+							</ErrorText>
+						</div>
 
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Additional Authors</span>
+						<!-- Additional Authors -->
+						<div class="flex flex-col justify-start">
+							<Label for="additional_authors"> Autores Adicionais </Label>
 							<input
+								class="primary-input"
+								id="additional_authors"
 								type="text"
 								v-model.trim="form.additional_authors"
 								placeholder="Co-autores (separados por vírgula)"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
-						</label>
+						</div>
 
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Number Of Pages</span>
+						<!-- Number of Pages -->
+						<div class="flex flex-col justify-start">
+							<Label for="number_of_pages"> Número de Páginas </Label>
 							<input
+								class="primary-input"
+								id="number_of_pages"
 								type="number"
 								v-model.number="form.number_of_pages"
 								min="1"
 								max="99999"
 								placeholder="Ex: 256"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
-						</label>
+						</div>
 
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Publication Year</span>
+						<!-- Publication Year -->
+						<div class="flex flex-col justify-start">
+							<Label for="publication_year"> Ano de Publicação </Label>
 							<input
+								class="primary-input"
+								id="publication_year"
 								type="number"
 								v-model.number="form.publication_year"
 								min="1"
 								max="9999"
 								placeholder="Ex: 2024"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
-						</label>
+						</div>
 
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Publisher</span>
+						<!-- Publisher -->
+						<div class="flex flex-col justify-start">
+							<Label for="publisher"> Editora </Label>
 							<input
+								class="primary-input"
+								id="publisher"
 								type="text"
 								v-model.trim="form.publisher"
 								placeholder="Nome da editora"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
-						</label>
+						</div>
 
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">ISBN-13</span>
+						<!-- ISBN-13 -->
+						<div class="flex flex-col justify-start">
+							<Label for="isbn13"> ISBN-13 </Label>
 							<input
+								class="primary-input"
+								id="isbn13"
 								type="text"
 								v-model.trim="form.isbn13"
 								placeholder="ISBN-13"
 								maxlength="17"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
-						</label>
+						</div>
 
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Read Count</span>
+						<!-- Read Count -->
+						<div class="flex flex-col justify-start">
+							<Label for="read_count" :error="!!fieldErrors.read_count">
+								Quantas vezes leu
+							</Label>
 							<input
+								class="primary-input"
+								id="read_count"
 								type="number"
 								v-model.number="form.read_count"
+								@input="clearFieldError('read_count')"
 								min="0"
 								max="32767"
-								placeholder="Quantas vezes leu"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								placeholder="Ex: 1"
+								:class="[
+									fieldErrors.read_count
+										? 'border-2 border-red-500 focus:ring-red-400'
+										: 'border border-gray-300 focus:ring-sky-400',
+								]"
 							/>
-						</label>
+							<ErrorText :show="!!fieldErrors.read_count">
+								{{ fieldErrors.read_count }}
+							</ErrorText>
+						</div>
 
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Data de Início da Leitura</span>
+						<!-- Start Date -->
+						<div class="flex flex-col justify-start">
+							<Label for="start_date"> Data de Início da Leitura </Label>
 							<input
+								class="primary-input"
+								id="start_date"
 								type="date"
 								v-model="form.start_date"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
-						</label>
+						</div>
 
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Data de Término da Leitura</span>
+						<!-- Finish Date -->
+						<div class="flex flex-col justify-start">
+							<Label for="finish_date"> Data de Término da Leitura </Label>
 							<input
+								class="primary-input"
+								id="finish_date"
 								type="date"
 								v-model="form.finish_date"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
 							/>
-						</label>
+						</div>
 
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">Reading Status</span>
+						<!-- Reading Status -->
+						<div class="flex flex-col justify-start">
+							<Label for="reading_status"> Status de Leitura </Label>
 							<select
+								id="reading_status"
 								v-model="form.reading_status"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								class="primary-input"
 							>
 								<option value="tbr">📚 Quero Ler</option>
 								<option value="currently-reading">📖 Lendo</option>
 								<option value="read">✅ Lido</option>
 								<option value="abandonado">❌ Abandonado</option>
 							</select>
-						</label>
+						</div>
 
-						<label class="flex flex-col">
-							<span class="font-medium mb-1">My Rating</span>
+						<!-- My Rating -->
+						<div class="flex flex-col justify-start">
+							<Label for="my_rating"> Minha Avaliação </Label>
 							<select
+								id="my_rating"
 								v-model="form.my_rating"
-								class="primary-input py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400"
+								class="primary-input"
 							>
 								<option value="">Não avaliado</option>
 								<option value="1">⭐ 1 estrela</option>
@@ -296,34 +409,35 @@ watch(
 								<option value="4">⭐⭐⭐⭐ 4 estrelas</option>
 								<option value="5">⭐⭐⭐⭐⭐ 5 estrelas</option>
 							</select>
-						</label>
+						</div>
 					</div>
 				</div>
-				<div class="flex gap-3 mt-6">
+
+				<!-- Actions -->
+				<div class="flex items-center justify-center gap-3 mt-6 pt-4">
 					<button
 						type="button"
 						@click="close"
-						class="btn-secundary flex-1 px-4 py-2 rounded-xl"
+						class="btn-secundary flex-2 rounded-xl font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 						:disabled="isSubmitting"
 					>
 						Cancelar
 					</button>
 					<button
 						type="submit"
-						class="btn-primary flex-1 px-4 py-2 rounded-xl"
+						class="btn-primary flex-2 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 						:disabled="isSubmitting"
 					>
-						{{ isSubmitting ? '⏳ Salvando...' : mode === 'add' ? '➕ Adicionar' : '💾 Salvar' }}
+						{{
+							isSubmitting
+								? '⏳ Salvando...'
+								: mode === 'add'
+								? '➕ Adicionar'
+								: '💾 Salvar'
+						}}
 					</button>
 				</div>
 			</form>
 		</div>
 	</div>
 </template>
-
-<style scoped>
-span.font-medium {
-	text-align: left;
-	padding-left: 12px;
-}
-</style>

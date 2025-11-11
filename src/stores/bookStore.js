@@ -8,6 +8,7 @@ export const useBookStore = defineStore('books', () => {
 	const authStore = useAuthStore();
 
 	const books = ref([]);
+	const booksOldOrder = ref([]);
 	const loading = ref(false);
 	const error = ref(null);
 	const currentPage = ref(1);
@@ -37,15 +38,26 @@ export const useBookStore = defineStore('books', () => {
 						?.map((rel) => rel.shelf_id) || [],
 			}));
 		} catch (err) {
-			console.error('[bookStore][enrichBooksWithShelves] Erro ao carregar estantes dos livros', {
-				message: err?.message || String(err),
-				details: err?.details,
-				hint: err?.hint,
-				code: err?.code,
-				stack: err?.stack,
-			});
+			console.error('[enrichBooksWithShelves] Erro:', err);
 			return books;
 		}
+	}
+
+	function orderBooks(books = []) {
+		// Safety: expect a plain array. Return a new array with any
+		// "currently-reading" item moved to the front.
+		if (!Array.isArray(books) || books.length === 0) return [];
+
+		booksOldOrder.value = [...books];
+
+		const idx = books.findIndex((b) => b && b.reading_status === 'currently-reading');
+
+		if (idx > -1) {
+			const [current] = books.splice(idx, 1);
+			books.unshift(current);
+		}
+
+		return books;
 	}
 
 	// Buscar livros
@@ -73,20 +85,15 @@ export const useBookStore = defineStore('books', () => {
 			if (booksError) throw booksError;
 
 			books.value = (await enrichBooksWithShelves(booksData)) || [];
+			booksOldOrder.value = (await orderBooks(books.value)) || [];
 			total.value = count || 0;
 			currentPage.value = page;
 			perPage.value = pageSize;
 
-			console.log('✅ Livros carregados:', books.value);
+			console.log('✅ Livros carregados:', books.value.length);
 		} catch (err) {
-			error.value = 'Não foi possível carregar os livros. Atualize a página e tente novamente.';
-			console.error('[bookStore][fetchBooks] Erro ao carregar livros', {
-				message: err?.message || String(err),
-				details: err?.details,
-				hint: err?.hint,
-				code: err?.code,
-				stack: err?.stack,
-			});
+			error.value = 'Não foi possível carregar os livros.';
+			console.error('[fetchBooks] Erro:', err);
 		} finally {
 			loading.value = false;
 		}
@@ -102,15 +109,9 @@ export const useBookStore = defineStore('books', () => {
 
 			if (supabaseError) throw supabaseError;
 			bookshelves.value = data || [];
-			console.log('✅ Estantes carregadas:', bookshelves.value);
+			console.log('✅ Estantes carregadas:', bookshelves.value.length);
 		} catch (err) {
-			console.error('[bookStore][fetchBookshelves] Erro ao carregar estantes', {
-				message: err?.message || String(err),
-				details: err?.details,
-				hint: err?.hint,
-				code: err?.code,
-				stack: err?.stack,
-			});
+			console.error('[fetchBookshelves] Erro:', err);
 		}
 	}
 
@@ -127,59 +128,38 @@ export const useBookStore = defineStore('books', () => {
 				);
 
 			if (supabaseError) throw supabaseError;
-
 			books.value = (await enrichBooksWithShelves(booksData)) || [];
-			console.log('✅ Livros encontrados:', books.value);
+			console.log('✅ Livros encontrados:', books.value.length);
 		} catch (err) {
-			error.value = 'Não foi possível buscar livros. Tente novamente.';
-			console.error('[bookStore][searchBook] Erro ao buscar livros', {
-				message: err?.message || String(err),
-				details: err?.details,
-				hint: err?.hint,
-				code: err?.code,
-				stack: err?.stack,
-			});
+			error.value = 'Não foi possível buscar livros.';
+			console.error('[searchBook] Erro:', err);
 		} finally {
 			loading.value = false;
 		}
 	}
 
 	// Adicionar livro e vincular shelves
-	// Adicionar livro e vincular shelves
 	async function addBook(newBook) {
-		console.log('🎯 [addBook-1] Iniciando addBook');
-		console.log('🎯 [addBook-2] canCreate:', authStore.canCreate);
+		console.log('🎯 [addBook] Iniciando');
 
 		if (!authStore.canCreate) {
-			console.error('[bookStore][addBook] Sem permissão para criar livro', {
-				canCreate: authStore.canCreate,
-			});
 			throw new Error('Você não tem permissão para adicionar livros');
 		}
 
-		console.log('🎯 [addBook-4] Permissão OK');
 		loading.value = true;
 		error.value = null;
 
 		try {
-			console.log('🎯 [addBook-5] Recebendo livro:', newBook);
-
 			// Extrai prateleiras antes de inserir o livro
 			const shelves = Array.isArray(newBook.book_bookshelves)
 				? newBook.book_bookshelves
 				: [];
 
-			console.log('🎯 [addBook-6] Shelves extraídas:', shelves);
-
 			// Remove book_bookshelves do objeto antes de inserir
 			const bookToInsert = { ...newBook };
 			delete bookToInsert.book_bookshelves;
 
-			console.log(
-				'🎯 [addBook-7] Livro a inserir (sem shelves):',
-				bookToInsert
-			);
-			console.log('🎯 [addBook-8] Chamando supabase.insert...');
+			console.log('📤 [addBook] Inserindo:', bookToInsert);
 
 			// 1️⃣ Insere o livro
 			const { data: inserted, error: insertErr } = await supabase
@@ -188,80 +168,55 @@ export const useBookStore = defineStore('books', () => {
 				.select('book_id')
 				.single();
 
-			console.log('🎯 [addBook-9] Resposta do supabase:', {
-				inserted,
-				insertErr,
-			});
-
 			if (insertErr) {
-				console.error('[bookStore][addBook] Erro na inserção do livro', {
-					message: insertErr?.message || String(insertErr),
-					details: insertErr?.details,
-					hint: insertErr?.hint,
-					code: insertErr?.code,
-				});
+				console.error('❌ [addBook] Erro ao inserir:', insertErr);
 				throw insertErr;
 			}
 
-			console.log('🎯 [addBook-12] Inserção OK');
 			const bookId = inserted.book_id;
-			console.log('🎯 [addBook-13] Book ID:', bookId);
+			console.log('✅ [addBook] Livro inserido:', bookId);
 
 			// 2️⃣ Relaciona as prateleiras (se houver)
 			if (shelves.length > 0) {
-				console.log('🎯 [addBook-14] Tem shelves para vincular');
 				const shelfLinks = shelves.map((shelfId) => ({
 					book_id: bookId,
 					shelf_id: shelfId,
 				}));
 
-				console.log('🎯 [addBook-15] Links a inserir:', shelfLinks);
-
 				const { error: relErr } = await supabase
 					.from('book_shelves')
 					.insert(shelfLinks);
 
-				console.log('🎯 [addBook-16] Resposta do vínculo:', relErr);
-
 				if (relErr) {
-					console.error('[bookStore][addBook] Erro ao vincular shelves', {
-						message: relErr?.message || String(relErr),
-						details: relErr?.details,
-						hint: relErr?.hint,
-						code: relErr?.code,
-					});
+					console.error('❌ [addBook] Erro ao vincular shelves:', relErr);
 					throw relErr;
 				}
-				console.log('🎯 [addBook-18] Shelves vinculadas OK');
-			} else {
-				console.log('🎯 [addBook-14] Nenhuma shelf para vincular');
+				console.log('✅ [addBook] Shelves vinculadas');
 			}
 
-			console.log('🎯 [addBook-19] Chamando fetchBooks...');
+			// 3️⃣ Recarrega os livros
 			await fetchBooks(currentPage.value);
-			console.log('🎯 [addBook-20] fetchBooks concluído');
+			console.log('✅ [addBook] Concluído');
 
-			console.log('🎯 [addBook-21] SUCESSO TOTAL - retornando:', inserted);
 			return inserted;
 		} catch (err) {
-			console.error('[bookStore][addBook] Erro ao adicionar livro', {
-				message: err?.message || String(err),
+			error.value = 'Não foi possível adicionar o livro.';
+			console.error('[addBook] Erro:', {
+				message: err?.message,
 				details: err?.details,
 				hint: err?.hint,
 				code: err?.code,
-				stack: err?.stack,
 			});
-			error.value = 'Não foi possível adicionar o livro. Tente novamente.';
 			throw err;
 		} finally {
-			console.log('🎯 [addBook-24] Finally - setando loading = false');
 			loading.value = false;
-			console.log('🎯 [addBook-25] Finally concluído');
 		}
 	}
 
 	// Atualizar livro
 	async function updateBook(bookId, updates) {
+		console.log('✏️ [updateBook] Iniciando');
+
 		if (!authStore.canEdit) {
 			throw new Error('Você não tem permissão para editar livros');
 		}
@@ -270,8 +225,6 @@ export const useBookStore = defineStore('books', () => {
 		error.value = null;
 
 		try {
-			console.log('📥 Recebendo atualização:', { bookId, updates });
-
 			// Extrai prateleiras (se vierem)
 			const shelves = updates.book_bookshelves
 				? Array.isArray(updates.book_bookshelves)
@@ -283,7 +236,7 @@ export const useBookStore = defineStore('books', () => {
 			const bookUpdates = { ...updates };
 			delete bookUpdates.book_bookshelves;
 
-			console.log('📤 Atualizando livro:', bookUpdates);
+			console.log('📤 [updateBook] Atualizando:', bookUpdates);
 
 			// 1️⃣ Atualiza o livro
 			const { data, error: supabaseError } = await supabase
@@ -294,45 +247,42 @@ export const useBookStore = defineStore('books', () => {
 				.single();
 
 			if (supabaseError) {
-				console.error('[bookStore][updateBook] Erro ao atualizar livro', {
-					message: supabaseError?.message || String(supabaseError),
-					details: supabaseError?.details,
-					hint: supabaseError?.hint,
-					code: supabaseError?.code,
-				});
+				console.error('❌ [updateBook] Erro ao atualizar:', supabaseError);
 				throw supabaseError;
 			}
 
-			console.log('✅ Livro atualizado:', data);
+			console.log('✅ [updateBook] Livro atualizado');
 
 			// 2️⃣ Atualiza as prateleiras
-			console.log('🗑️ Removendo vínculos antigos de estantes');
-			await supabase.from('book_shelves').delete().eq('book_id', bookId);
+			// Remove vínculos antigos
+			const { error: deleteError } = await supabase
+				.from('book_shelves')
+				.delete()
+				.eq('book_id', bookId);
 
+			if (deleteError) {
+				console.error('❌ [updateBook] Erro ao deletar vínculos:', deleteError);
+			}
+
+			// Adiciona novos vínculos
 			if (shelves.length > 0) {
 				const shelfLinks = shelves.map((shelfId) => ({
 					book_id: bookId,
 					shelf_id: parseInt(shelfId),
 				}));
 
-				console.log('📚 Vinculando novas estantes:', shelfLinks);
-
 				const { error: relErr } = await supabase
 					.from('book_shelves')
 					.insert(shelfLinks);
 
 				if (relErr) {
-					console.error('[bookStore][updateBook] Erro ao vincular estantes', {
-						message: relErr?.message || String(relErr),
-						details: relErr?.details,
-						hint: relErr?.hint,
-						code: relErr?.code,
-					});
+					console.error('❌ [updateBook] Erro ao vincular shelves:', relErr);
 					throw relErr;
 				}
+				console.log('✅ [updateBook] Shelves atualizadas');
 			}
 
-			// Atualiza livro no array local
+			// 3️⃣ Atualiza livro no array local
 			const index = books.value.findIndex((book) => book.book_id === bookId);
 			if (index !== -1) {
 				books.value[index] = {
@@ -341,17 +291,18 @@ export const useBookStore = defineStore('books', () => {
 				};
 			}
 
-			console.log('✅ Livro atualizado com sucesso');
+			// 4️⃣ Recarrega os livros
 			await fetchBooks(currentPage.value);
+			console.log('✅ [updateBook] Concluído');
+
 			return data;
 		} catch (err) {
-			error.value = 'Não foi possível atualizar o livro. Tente novamente.';
-			console.error('[bookStore][updateBook] Erro ao atualizar livro (catch)', {
-				message: err?.message || String(err),
+			error.value = 'Não foi possível atualizar o livro.';
+			console.error('[updateBook] Erro:', {
+				message: err?.message,
 				details: err?.details,
 				hint: err?.hint,
 				code: err?.code,
-				stack: err?.stack,
 			});
 			throw err;
 		} finally {
@@ -380,14 +331,8 @@ export const useBookStore = defineStore('books', () => {
 			console.log('✅ Livro deletado:', id);
 			await fetchBooks(currentPage.value);
 		} catch (err) {
-			error.value = 'Não foi possível deletar o livro. Tente novamente.';
-			console.error('[bookStore][deleteBook] Erro ao deletar livro', {
-				message: err?.message || String(err),
-				details: err?.details,
-				hint: err?.hint,
-				code: err?.code,
-				stack: err?.stack,
-			});
+			error.value = 'Não foi possível deletar o livro.';
+			console.error('[deleteBook] Erro:', err);
 			throw err;
 		} finally {
 			loading.value = false;
@@ -396,6 +341,7 @@ export const useBookStore = defineStore('books', () => {
 
 	return {
 		books,
+		booksOldOrder,
 		loading,
 		error,
 		currentPage,

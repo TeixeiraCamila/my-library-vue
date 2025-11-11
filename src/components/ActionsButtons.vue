@@ -1,4 +1,5 @@
 <script setup>
+import { Trash, Pencil } from 'lucide-vue-next';
 import { defineProps } from 'vue';
 
 import { useBookStore } from '../stores/bookStore';
@@ -43,17 +44,19 @@ async function handleDeleteBook(bookId) {
 	<div class="book-actions flex items-center justify-center gap-10">
 		<button
 			v-if="authStore.canEdit"
-			class="btn-secundary hover:scale-105"
+			class="btn-secundary hover:scale-105  flex items-center gap-1"
 			@click="handleEditBook(book)"
 		>
-			✏️ Editar
+    <Pencil :size="20" :stroke-width="2.5" />
+			Editar
 		</button>
 		<button
 			v-if="authStore.canDelete"
-			class="btn-secundary hover:scale-105"
+			class="btn-secundary hover:scale-105 flex items-center gap-1"
 			@click="handleDeleteBook(book.book_id)"
 		>
-			🗑️ Deletar
+			<Trash :size="20" :stroke-width="2.5" />
+			Deletar
 		</button>
 	</div>
 </template>

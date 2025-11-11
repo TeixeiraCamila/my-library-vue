@@ -16,6 +16,7 @@
 	--box-shadow: 0 0 #000, 0 0 #000, 2.8px 2.8px 0 0 #222222;
 	--max-width: 78rem;
 	--border-radius: 10px;
+	--padding: 10px;
 
 	--to-be-read: #d6ffd8;
 	--read: #fff2c2;
@@ -49,19 +50,19 @@ body {
 }
 .primary-input {
 	box-shadow: 0 0 #000, 0 0 #000, 2.8px 2.8px 0 0 #ffdede99;
-	background: #fff;
+	background: var(--panel);
 	border: 2px solid #ffdede99;
 	width: clamp(200px, 50vw, 300px);
 	font-size: 16px;
 	transition: box-shadow 0.3s;
-	padding: 10px;
+	padding: var(--padding);
 	border-radius: var(--border-radius);
-  color: var(--muted);
+	color: var(--muted);
 }
 .primary-input:focus {
 	outline: none;
 	box-shadow: 0 0 #000, 0 0 #000, 2.8px 2.8px 0 0 #e27777;
-  color: #000;
+	color: #000;
 }
 .btn-primary {
 	box-shadow: var(--box-shadow);
@@ -81,7 +82,7 @@ body {
 	transition: all 0.12s ease;
 }
 .btn-secundary:hover:not(:disabled) {
-	box-shadow: var(--box-shadow);
+	transform: translateY(-6px);
 }
 .btn-primary:hover:not(:disabled) {
 	transform: translateY(-6px);

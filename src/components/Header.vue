@@ -1,10 +1,10 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import Search from './Search.vue';
 import UserMenu from './UserMenu.vue';
+import Heading from './ui/Heading.vue';
 
-
-
+// mobile menu
 const mobileMenuOpen = ref(false);
 
 const handleClickOutside = (event) => {
@@ -13,30 +13,56 @@ const handleClickOutside = (event) => {
 	}
 };
 
+// sticky on scroll
+const isSticky = ref(false);
+const headerRef = ref(null);
+const headerHeight = ref(0);
 
-onMounted(() => {
+const onScroll = () => {
+	const y = window.scrollY || window.pageYOffset;
+	isSticky.value = y > 10; // becomes sticky after small scroll
+};
+
+const updateHeaderHeight = () => {
+	if (headerRef.value) headerHeight.value = headerRef.value.offsetHeight;
+};
+
+onMounted(async () => {
 	document.addEventListener('click', handleClickOutside);
+	window.addEventListener('scroll', onScroll, { passive: true });
+	window.addEventListener('resize', updateHeaderHeight);
+	await nextTick();
+	updateHeaderHeight();
 });
 
 onUnmounted(() => {
 	document.removeEventListener('click', handleClickOutside);
+	window.removeEventListener('scroll', onScroll);
+	window.removeEventListener('resize', updateHeaderHeight);
 });
 </script>
 
 <template>
-	<header class="bg-gradient-to-b from-amber-50 to-amber-100 shadow-sm">
-		<nav class="container mx-auto px-5 py-5 relative">
-			<div class="flex items-center justify-between gap-6">
-				<!-- Logo e Menu Mobile Toggle -->
-				<div class="flex items-center gap-4 mobile-menu-container">
-					<h1
-						class="text-3xl font-bold text-gray-800 whitespace-nowrap"
-						style="text-shadow: 2px 2px rgba(255, 107, 107, 0.12)"
-					>
-						My Library
-					</h1>
+	<!-- placeholder to avoid layout jump when header becomes fixed -->
+	<div
+		v-if="isSticky"
+		:style="{ height: headerHeight + 'px' }"
+		aria-hidden="true"
+	></div>
 
-					<!-- Botão Menu Mobile -->
+	<header
+		ref="headerRef"
+		:class="[
+			'bg-gradient-to-b from-amber-50 to-amber-100',
+			'w-full',
+			isSticky ? 'fixed top-0 left-0 right-0 z-50 shadow-md' : 'shadow-sm',
+		]"
+	>
+		<nav class="container mx-auto px-5 py-4 relative">
+			<div class="flex items-center justify-between gap-6">
+				<div class="flex items-center gap-4 mobile-menu-container">
+					<Heading :level="2" :weight="bold"> My Library </Heading>
+
 					<button
 						type="button"
 						class="md:hidden p-2 hover:bg-amber-200 rounded-lg transition-colors"
@@ -59,19 +85,10 @@ onUnmounted(() => {
 						</svg>
 					</button>
 
-					<!-- Menu Desktop -->
 					<div class="hidden md:flex items-center gap-3">
 						<Search />
-						<!-- <button
-							v-if="authStore.canCreate"
-							@click="handleAddBook"
-							class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium transition-colors duration-200 whitespace-nowrap"
-						>
-							➕ Adicionar Livro
-						</button> -->
 					</div>
 
-					<!-- Menu Mobile (Dropdown) -->
 					<div
 						v-if="mobileMenuOpen"
 						class="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg z-50 md:hidden"
@@ -79,12 +96,10 @@ onUnmounted(() => {
 					>
 						<div class="p-4 flex flex-col gap-3">
 							<Search />
-							
 						</div>
 					</div>
 				</div>
 
-				<!-- User Menu -->
 				<UserMenu />
 			</div>
 		</nav>
